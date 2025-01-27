@@ -25,6 +25,7 @@ import org.flowable.batch.api.BatchPartQuery;
 import org.flowable.batch.api.BatchQuery;
 import org.flowable.common.engine.api.FlowableIllegalArgumentException;
 import org.flowable.common.engine.api.FlowableObjectNotFoundException;
+import org.flowable.common.engine.api.lock.LockManager;
 import org.flowable.common.engine.api.management.TableMetaData;
 import org.flowable.common.engine.api.management.TablePage;
 import org.flowable.common.engine.api.management.TablePageQuery;
@@ -32,7 +33,6 @@ import org.flowable.common.engine.api.tenant.ChangeTenantIdBuilder;
 import org.flowable.common.engine.impl.cmd.CustomSqlExecution;
 import org.flowable.common.engine.impl.interceptor.Command;
 import org.flowable.common.engine.impl.interceptor.CommandConfig;
-import org.flowable.common.engine.impl.lock.LockManager;
 import org.flowable.engine.event.EventLogEntry;
 import org.flowable.engine.runtime.ExternalWorkerCompletionBuilder;
 import org.flowable.job.api.DeadLetterJobQuery;
@@ -530,6 +530,21 @@ public interface ManagementService {
      */
     ExternalWorkerCompletionBuilder createExternalWorkerCompletionBuilder(String externalJobId, String workerId);
 
+    /**
+     * Unaquire a locked external worker job.
+     */
+    void unacquireExternalWorkerJob(String jobId, String workerId);
+    
+    /**
+     * Unaquire all locked external worker jobs for worker.
+     */
+    void unacquireAllExternalWorkerJobsForWorker(String workerId);
+    
+    /**
+     * Unaquire all locked external worker jobs for worker and tenant.
+     */
+    void unacquireAllExternalWorkerJobsForWorker(String workerId, String tenantId);
+    
     /**
      * Create a {@link ChangeTenantIdBuilder} that can be used to change the tenant id of the process instances
      * and all the related instances. See {@link BpmnChangeTenantIdEntityTypes} for related instances.

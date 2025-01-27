@@ -18,8 +18,6 @@ import static org.flowable.common.rest.api.PaginateListUtil.paginateList;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.flowable.cmmn.api.CmmnRepositoryService;
 import org.flowable.cmmn.api.repository.CaseDefinitionQuery;
 import org.flowable.cmmn.engine.impl.repository.CaseDefinitionQueryProperty;
@@ -94,7 +92,7 @@ public class CaseDefinitionCollectionResource {
             @ApiResponse(code = 400, message = "Indicates a parameter was passed in the wrong format or that latest is used with other parameters other than key and keyLike. The status-message contains additional information.")
     })
     @GetMapping(value = "/cmmn-repository/case-definitions", produces = "application/json")
-    public DataResponse<CaseDefinitionResponse> getProcessDefinitions(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<CaseDefinitionResponse> getProcessDefinitions(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         CaseDefinitionQuery caseDefinitionQuery = repositoryService.createCaseDefinitionQuery();
 
         // Populate filter-parameters
@@ -132,8 +130,7 @@ public class CaseDefinitionCollectionResource {
             caseDefinitionQuery.caseDefinitionVersion(Integer.valueOf(allRequestParams.get("version")));
         }
         if (allRequestParams.containsKey("latest")) {
-            Boolean latest = Boolean.valueOf(allRequestParams.get("latest"));
-            if (latest != null && latest) {
+            if (Boolean.parseBoolean(allRequestParams.get("latest"))) {
                 caseDefinitionQuery.latestVersion();
             }
         }

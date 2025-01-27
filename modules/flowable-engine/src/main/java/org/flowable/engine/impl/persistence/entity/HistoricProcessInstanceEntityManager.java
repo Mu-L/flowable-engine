@@ -12,6 +12,7 @@
  */
 package org.flowable.engine.impl.persistence.entity;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -35,9 +36,13 @@ public interface HistoricProcessInstanceEntityManager extends EntityManager<Hist
 
     List<HistoricProcessInstance> findHistoricProcessInstancesAndVariablesByQueryCriteria(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery);
 
+    List<HistoricProcessInstance> findHistoricProcessInstanceIdsByQueryCriteria(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery);
+    
     List<HistoricProcessInstance> findHistoricProcessInstancesByNativeQuery(Map<String, Object> parameterMap);
 
     List<HistoricProcessInstance> findHistoricProcessInstancesBySuperProcessInstanceId(String historicProcessInstanceId);
+    
+    List<String> findHistoricProcessInstanceIdsBySuperProcessInstanceIds(Collection<String> superProcessInstanceIds);
     
     List<String> findHistoricProcessInstanceIdsByProcessDefinitionId(String processDefinitionId);
     
@@ -45,4 +50,5 @@ public interface HistoricProcessInstanceEntityManager extends EntityManager<Hist
     
     void deleteHistoricProcessInstances(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery);
 
+    void bulkDeleteHistoricProcessInstances(Collection<String> processInstanceIds);
 }

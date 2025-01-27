@@ -13,7 +13,7 @@
 
 package org.flowable.engine.impl.persistence.entity;
 
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -28,8 +28,8 @@ import org.flowable.engine.impl.persistence.entity.data.HistoricProcessInstanceD
  * @author Joram Barrez
  */
 public class HistoricProcessInstanceEntityManagerImpl
-    extends AbstractProcessEngineEntityManager<HistoricProcessInstanceEntity, HistoricProcessInstanceDataManager>
-    implements HistoricProcessInstanceEntityManager {
+        extends AbstractProcessEngineEntityManager<HistoricProcessInstanceEntity, HistoricProcessInstanceDataManager>
+        implements HistoricProcessInstanceEntityManager {
 
     public HistoricProcessInstanceEntityManagerImpl(ProcessEngineConfigurationImpl processEngineConfiguration, HistoricProcessInstanceDataManager historicProcessInstanceDataManager) {
         super(processEngineConfiguration, historicProcessInstanceDataManager);
@@ -42,28 +42,22 @@ public class HistoricProcessInstanceEntityManagerImpl
 
     @Override
     public long findHistoricProcessInstanceCountByQueryCriteria(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery) {
-        if (getHistoryManager().isHistoryEnabled()) {
-            return dataManager.findHistoricProcessInstanceCountByQueryCriteria(historicProcessInstanceQuery);
-        }
-        return 0;
+        return dataManager.findHistoricProcessInstanceCountByQueryCriteria(historicProcessInstanceQuery);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public List<HistoricProcessInstance> findHistoricProcessInstancesByQueryCriteria(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery) {
-        if (getHistoryManager().isHistoryEnabled()) {
-            return dataManager.findHistoricProcessInstancesByQueryCriteria(historicProcessInstanceQuery);
-        }
-        return Collections.EMPTY_LIST;
+        return dataManager.findHistoricProcessInstancesByQueryCriteria(historicProcessInstanceQuery);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public List<HistoricProcessInstance> findHistoricProcessInstancesAndVariablesByQueryCriteria(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery) {
-        if (getHistoryManager().isHistoryEnabled()) {
-            return dataManager.findHistoricProcessInstancesAndVariablesByQueryCriteria(historicProcessInstanceQuery);
-        }
-        return Collections.EMPTY_LIST;
+        return dataManager.findHistoricProcessInstancesAndVariablesByQueryCriteria(historicProcessInstanceQuery);
+    }
+    
+    @Override
+    public List<HistoricProcessInstance> findHistoricProcessInstanceIdsByQueryCriteria(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery) {
+        return dataManager.findHistoricProcessInstanceIdsByQueryCriteria(historicProcessInstanceQuery);
     }
 
     @Override
@@ -77,6 +71,11 @@ public class HistoricProcessInstanceEntityManagerImpl
     }
     
     @Override
+    public List<String> findHistoricProcessInstanceIdsBySuperProcessInstanceIds(Collection<String> superProcessInstanceIds) {
+        return dataManager.findHistoricProcessInstanceIdsBySuperProcessInstanceIds(superProcessInstanceIds);
+    }
+
+    @Override
     public List<String> findHistoricProcessInstanceIdsByProcessDefinitionId(String processDefinitionId) {
         return dataManager.findHistoricProcessInstanceIdsByProcessDefinitionId(processDefinitionId);
     }
@@ -89,6 +88,11 @@ public class HistoricProcessInstanceEntityManagerImpl
     @Override
     public void deleteHistoricProcessInstances(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery) {
         dataManager.deleteHistoricProcessInstances(historicProcessInstanceQuery);
+    }
+    
+    @Override
+    public void bulkDeleteHistoricProcessInstances(Collection<String> processInstanceIds) {
+        dataManager.bulkDeleteHistoricProcessInstances(processInstanceIds);
     }
 
     protected HistoryManager getHistoryManager() {

@@ -31,11 +31,27 @@ public class CaseInstanceQueryRequest extends PaginateRequest {
     private String caseInstanceId;
     private String caseDefinitionId;
     private String caseDefinitionKey;
+    private String caseDefinitionKeyLike;
+    private String caseDefinitionKeyLikeIgnoreCase;
+    private Set<String> caseDefinitionKeys;
     private String caseDefinitionCategory;
+    private String caseDefinitionCategoryLike;
+    private String caseDefinitionCategoryLikeIgnoreCase;
     private String caseDefinitionName;
+    private String caseDefinitionNameLike;
+    private String caseDefinitionNameLikeIgnoreCase;
     private String caseBusinessKey;
+    private String caseInstanceName;
+    private String caseInstanceNameLike;
+    private String caseInstanceNameLikeIgnoreCase;
+    private String caseInstanceRootScopeId;
+    private String caseInstanceParentScopeId;
     private String caseInstanceBusinessKey;
+    private String caseInstanceBusinessKeyLike;
+    private String caseInstanceBusinessKeyLikeIgnoreCase;
     private String caseInstanceBusinessStatus;
+    private String caseInstanceBusinessStatusLike;
+    private String caseInstanceBusinessStatusLikeIgnoreCase;
     private String caseInstanceParentId;
     private String caseInstanceStartedBy;
     private Date caseInstanceStartedBefore;
@@ -55,6 +71,7 @@ public class CaseInstanceQueryRequest extends PaginateRequest {
     private Set<String> activePlanItemDefinitionIds;
     private String tenantId;
     private String tenantIdLike;
+    private String tenantIdLikeIgnoreCase;
     private Boolean withoutTenantId;
 
     public String getCaseInstanceId() {
@@ -73,6 +90,22 @@ public class CaseInstanceQueryRequest extends PaginateRequest {
         this.caseBusinessKey = caseBusinessKey;
     }
 
+    public String getCaseDefinitionKeyLike() {
+        return caseDefinitionKeyLike;
+    }
+
+    public void setCaseDefinitionKeyLike(String caseDefinitionKeyLike) {
+        this.caseDefinitionKeyLike = caseDefinitionKeyLike;
+    }
+
+    public String getCaseDefinitionKeyLikeIgnoreCase() {
+        return caseDefinitionKeyLikeIgnoreCase;
+    }
+
+    public void setCaseDefinitionKeyLikeIgnoreCase(String caseDefinitionKeyLikeIgnoreCase) {
+        this.caseDefinitionKeyLikeIgnoreCase = caseDefinitionKeyLikeIgnoreCase;
+    }
+
     public String getCaseDefinitionId() {
         return caseDefinitionId;
     }
@@ -89,6 +122,14 @@ public class CaseInstanceQueryRequest extends PaginateRequest {
         this.caseDefinitionKey = caseDefinitionKey;
     }
 
+    public Set<String> getCaseDefinitionKeys() {
+        return caseDefinitionKeys;
+    }
+
+    public void setCaseDefinitionKeys(Set<String> caseDefinitionKeys) {
+        this.caseDefinitionKeys = caseDefinitionKeys;
+    }
+
     public String getCaseDefinitionCategory() {
         return caseDefinitionCategory;
     }
@@ -97,12 +138,84 @@ public class CaseInstanceQueryRequest extends PaginateRequest {
         this.caseDefinitionCategory = caseDefinitionCategory;
     }
     
+    public String getCaseDefinitionCategoryLike() {
+        return caseDefinitionCategoryLike;
+    }
+
+    public void setCaseDefinitionCategoryLike(String caseDefinitionCategoryLike) {
+        this.caseDefinitionCategoryLike = caseDefinitionCategoryLike;
+    }
+
+    public String getCaseDefinitionCategoryLikeIgnoreCase() {
+        return caseDefinitionCategoryLikeIgnoreCase;
+    }
+
+    public void setCaseDefinitionCategoryLikeIgnoreCase(String caseDefinitionCategoryLikeIgnoreCase) {
+        this.caseDefinitionCategoryLikeIgnoreCase = caseDefinitionCategoryLikeIgnoreCase;
+    }
+    
     public String getCaseDefinitionName() {
         return caseDefinitionName;
     }
 
     public void setCaseDefinitionName(String caseDefinitionName) {
         this.caseDefinitionName = caseDefinitionName;
+    }
+    
+    public String getCaseDefinitionNameLike() {
+        return caseDefinitionNameLike;
+    }
+
+    public void setCaseDefinitionNameLike(String caseDefinitionNameLike) {
+        this.caseDefinitionNameLike = caseDefinitionNameLike;
+    }
+
+    public String getCaseDefinitionNameLikeIgnoreCase() {
+        return caseDefinitionNameLikeIgnoreCase;
+    }
+
+    public void setCaseDefinitionNameLikeIgnoreCase(String caseDefinitionNameLikeIgnoreCase) {
+        this.caseDefinitionNameLikeIgnoreCase = caseDefinitionNameLikeIgnoreCase;
+    }
+
+    public String getCaseInstanceName() {
+        return caseInstanceName;
+    }
+
+    public void setCaseInstanceName(String caseInstanceName) {
+        this.caseInstanceName = caseInstanceName;
+    }
+
+    public String getCaseInstanceNameLike() {
+        return caseInstanceNameLike;
+    }
+
+    public void setCaseInstanceNameLike(String caseInstanceNameLike) {
+        this.caseInstanceNameLike = caseInstanceNameLike;
+    }
+
+    public String getCaseInstanceNameLikeIgnoreCase() {
+        return caseInstanceNameLikeIgnoreCase;
+    }
+
+    public void setCaseInstanceNameLikeIgnoreCase(String caseInstanceNameLikeIgnoreCase) {
+        this.caseInstanceNameLikeIgnoreCase = caseInstanceNameLikeIgnoreCase;
+    }
+
+    public String getCaseInstanceRootScopeId() {
+        return caseInstanceRootScopeId;
+    }
+
+    public void setCaseInstanceRootScopeId(String caseInstanceRootScopeId) {
+        this.caseInstanceRootScopeId = caseInstanceRootScopeId;
+    }
+
+    public String getCaseInstanceParentScopeId() {
+        return caseInstanceParentScopeId;
+    }
+
+    public void setCaseInstanceParentScopeId(String caseInstanceParentScopeId) {
+        this.caseInstanceParentScopeId = caseInstanceParentScopeId;
     }
 
     public String getCaseInstanceBusinessKey() {
@@ -113,12 +226,44 @@ public class CaseInstanceQueryRequest extends PaginateRequest {
         this.caseInstanceBusinessKey = caseInstanceBusinessKey;
     }
 
+    public String getCaseInstanceBusinessKeyLike() {
+        return caseInstanceBusinessKeyLike;
+    }
+
+    public void setCaseInstanceBusinessKeyLike(String caseInstanceBusinessKeyLike) {
+        this.caseInstanceBusinessKeyLike = caseInstanceBusinessKeyLike;
+    }
+
+    public String getCaseInstanceBusinessKeyLikeIgnoreCase() {
+        return caseInstanceBusinessKeyLikeIgnoreCase;
+    }
+
+    public void setCaseInstanceBusinessKeyLikeIgnoreCase(String caseInstanceBusinessKeyLikeIgnoreCase) {
+        this.caseInstanceBusinessKeyLikeIgnoreCase = caseInstanceBusinessKeyLikeIgnoreCase;
+    }
+
     public String getCaseInstanceBusinessStatus() {
         return caseInstanceBusinessStatus;
     }
 
     public void setCaseInstanceBusinessStatus(String caseInstanceBusinessStatus) {
         this.caseInstanceBusinessStatus = caseInstanceBusinessStatus;
+    }
+    
+    public String getCaseInstanceBusinessStatusLike() {
+        return caseInstanceBusinessStatusLike;
+    }
+
+    public void setCaseInstanceBusinessStatusLike(String caseInstanceBusinessStatusLike) {
+        this.caseInstanceBusinessStatusLike = caseInstanceBusinessStatusLike;
+    }
+
+    public String getCaseInstanceBusinessStatusLikeIgnoreCase() {
+        return caseInstanceBusinessStatusLikeIgnoreCase;
+    }
+
+    public void setCaseInstanceBusinessStatusLikeIgnoreCase(String caseInstanceBusinessStatusLikeIgnoreCase) {
+        this.caseInstanceBusinessStatusLikeIgnoreCase = caseInstanceBusinessStatusLikeIgnoreCase;
     }
 
     public String getCaseInstanceStartedBy() {
@@ -280,5 +425,13 @@ public class CaseInstanceQueryRequest extends PaginateRequest {
 
     public void setTenantIdLike(String tenantIdLike) {
         this.tenantIdLike = tenantIdLike;
+    }
+    
+    public String getTenantIdLikeIgnoreCase() {
+        return tenantIdLikeIgnoreCase;
+    }
+
+    public void setTenantIdLikeIgnoreCase(String tenantIdLikeIgnoreCase) {
+        this.tenantIdLikeIgnoreCase = tenantIdLikeIgnoreCase;
     }
 }

@@ -15,9 +15,8 @@ package org.flowable.rest.service.api.management;
 
 import static org.flowable.common.rest.api.PaginateListUtil.paginateList;
 
+import java.util.Arrays;
 import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
 
 import org.flowable.common.rest.api.DataResponse;
 import org.flowable.engine.ManagementService;
@@ -60,6 +59,8 @@ public class HistoryJobCollectionResource {
             @ApiImplicitParam(name = "withException", dataType = "boolean", value = "If true, only return jobs for which an exception occurred while executing it. If false, this parameter is ignored.", paramType = "query"),
             @ApiImplicitParam(name = "exceptionMessage", dataType = "string", value = "Only return jobs with the given exception message", paramType = "query"),
             @ApiImplicitParam(name = "scopeType", dataType = "string", value = "Only return jobs with the given scope type", paramType = "query"),
+            @ApiImplicitParam(name = "handlerType", dataType = "string", value = "Only return jobs with the given handler type", paramType = "query"),
+            @ApiImplicitParam(name = "handlerTypes", dataType = "string", value = "Only return jobs which have one of the given job handler type", paramType = "query"),
             @ApiImplicitParam(name = "tenantId", dataType = "string", value = "Only return jobs with the given tenantId.", paramType = "query"),
             @ApiImplicitParam(name = "tenantIdLike", dataType = "string", value = "Only return jobs with a tenantId like the given value.", paramType = "query"),
             @ApiImplicitParam(name = "withoutTenantId", dataType = "boolean", value = "If true, only returns jobs without a tenantId set. If false, the withoutTenantId parameter is ignored.", paramType = "query"),
@@ -73,7 +74,7 @@ public class HistoryJobCollectionResource {
             @ApiResponse(code = 400, message = "Indicates an illegal value has been used in a url query parameter. Status description contains additional details about the error.")
     })
     @GetMapping(value = "/management/history-jobs", produces = "application/json")
-    public DataResponse<HistoryJobResponse> getHistoryJobs(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<HistoryJobResponse> getHistoryJobs(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         HistoryJobQuery query = managementService.createHistoryJobQuery();
 
         if (allRequestParams.containsKey("id")) {
@@ -82,8 +83,14 @@ public class HistoryJobCollectionResource {
         if (allRequestParams.containsKey("scopeType")) {
             query.jobId(allRequestParams.get("scopeType"));
         }
+        if (allRequestParams.containsKey("handlerType")) {
+            query.handlerType(allRequestParams.get("handlerType"));
+        }
+        if (allRequestParams.containsKey("handlerTypes")) {
+            query.handlerTypes(Arrays.asList(allRequestParams.get("handlerTypes").split(",")));
+        }
         if (allRequestParams.containsKey("withException")) {
-            if (Boolean.valueOf(allRequestParams.get("withException"))) {
+            if (Boolean.parseBoolean(allRequestParams.get("withException"))) {
                 query.withException();
             }
         }
@@ -94,12 +101,12 @@ public class HistoryJobCollectionResource {
             query.lockOwner(allRequestParams.get("lockOwner"));
         }
         if (allRequestParams.containsKey("locked")) {
-            if (Boolean.valueOf(allRequestParams.get("locked"))) {
+            if (Boolean.parseBoolean(allRequestParams.get("locked"))) {
                 query.locked();
             }
         }
         if (allRequestParams.containsKey("unlocked")) {
-            if (Boolean.valueOf(allRequestParams.get("unlocked"))) {
+            if (Boolean.parseBoolean(allRequestParams.get("unlocked"))) {
                 query.unlocked();
             }
         }
@@ -110,7 +117,7 @@ public class HistoryJobCollectionResource {
             query.jobTenantIdLike(allRequestParams.get("tenantIdLike"));
         }
         if (allRequestParams.containsKey("withoutTenantId")) {
-            if (Boolean.valueOf(allRequestParams.get("withoutTenantId"))) {
+            if (Boolean.parseBoolean(allRequestParams.get("withoutTenantId"))) {
                 query.jobWithoutTenantId();
             }
         }

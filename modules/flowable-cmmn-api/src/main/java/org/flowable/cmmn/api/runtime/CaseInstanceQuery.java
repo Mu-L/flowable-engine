@@ -25,15 +25,31 @@ import org.flowable.common.engine.api.query.Query;
 public interface CaseInstanceQuery extends Query<CaseInstanceQuery, CaseInstance> {
 
     CaseInstanceQuery caseDefinitionKey(String caseDefinitionKey);
+    CaseInstanceQuery caseDefinitionKeyLike(String caseDefinitionKeyLike);
+    CaseInstanceQuery caseDefinitionKeyLikeIgnoreCase(String caseDefinitionKeyLikeIgnoreCase);
     CaseInstanceQuery caseDefinitionKeys(Set<String> caseDefinitionKeys);
     CaseInstanceQuery caseDefinitionId(String caseDefinitionId);
+    CaseInstanceQuery caseDefinitionIds(Set<String> caseDefinitionIds);
     CaseInstanceQuery caseDefinitionCategory(String caseDefinitionCategory);
+    CaseInstanceQuery caseDefinitionCategoryLike(String caseDefinitionCategoryLike);
+    CaseInstanceQuery caseDefinitionCategoryLikeIgnoreCase(String caseDefinitionCategoryLikeIgnoreCase);
     CaseInstanceQuery caseDefinitionName(String caseDefinitionName);
+    CaseInstanceQuery caseDefinitionNameLike(String caseDefinitionNameLike);
+    CaseInstanceQuery caseDefinitionNameLikeIgnoreCase(String caseDefinitionNameLikeIgnoreCase);
     CaseInstanceQuery caseDefinitionVersion(Integer caseDefinitionVersion);
     CaseInstanceQuery caseInstanceId(String caseInstanceId);
     CaseInstanceQuery caseInstanceIds(Set<String> caseInstanceIds);
+    CaseInstanceQuery caseInstanceName(String caseInstanceName);
+    CaseInstanceQuery caseInstanceNameLike(String caseInstanceNameLike);
+    CaseInstanceQuery caseInstanceNameLikeIgnoreCase(String caseInstanceNameLikeIgnoreCase);
+    CaseInstanceQuery caseInstanceRootScopeId(String rootScopeId);
+    CaseInstanceQuery caseInstanceParentScopeId(String parentScopeId);
     CaseInstanceQuery caseInstanceBusinessKey(String caseInstanceBusinessKey);
+    CaseInstanceQuery caseInstanceBusinessKeyLike(String caseInstanceBusinessKeyLike);
+    CaseInstanceQuery caseInstanceBusinessKeyLikeIgnoreCase(String caseInstanceBusinessKeyLikeIgnoreCase);
     CaseInstanceQuery caseInstanceBusinessStatus(String caseInstanceBusinessStatus);
+    CaseInstanceQuery caseInstanceBusinessStatusLike(String caseInstanceBusinessStatusLike);
+    CaseInstanceQuery caseInstanceBusinessStatusLikeIgnoreCase(String caseInstanceBusinessStatusLikeIgnoreCase);
     CaseInstanceQuery caseInstanceParentId(String parentId);
     CaseInstanceQuery caseInstanceStartedBefore(Date beforeTime);
     CaseInstanceQuery caseInstanceStartedAfter(Date afterTime);
@@ -49,6 +65,7 @@ public interface CaseInstanceQuery extends Query<CaseInstanceQuery, CaseInstance
     CaseInstanceQuery caseInstanceIsCompleteable();
     CaseInstanceQuery caseInstanceTenantId(String tenantId);
     CaseInstanceQuery caseInstanceTenantIdLike(String tenantIdLike);
+    CaseInstanceQuery caseInstanceTenantIdLikeIgnoreCase(String tenantIdLikeIgnoreCase);
     CaseInstanceQuery caseInstanceWithoutTenantId();
     
     /**
@@ -229,13 +246,6 @@ public interface CaseInstanceQuery extends Query<CaseInstanceQuery, CaseInstance
      * End an OR statement.
      */
     CaseInstanceQuery endOr();
-
-    /**
-     * Limit case instance variables
-     * @deprecated no longer needed, this is a noop
-     */
-    @Deprecated
-    CaseInstanceQuery limitCaseInstanceVariables(Integer caseInstanceVariablesLimit);
 
     /**
      * Localize case name to specified locale.

@@ -15,15 +15,15 @@ package org.flowable.cmmn.rest.service.api.repository;
 
 import static org.flowable.common.rest.api.PaginateListUtil.paginateList;
 
-import java.io.UnsupportedEncodingException;
+import java.io.InputStream;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-
 import java.util.zip.ZipInputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.commons.lang3.StringUtils;
 import org.flowable.cmmn.api.CmmnRepositoryService;
@@ -42,6 +42,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
@@ -99,7 +100,7 @@ public class DeploymentCollectionResource {
             @ApiResponse(code = 200, message = "Indicates the request was successful."),
     })
     @GetMapping(value = "/cmmn-repository/deployments", produces = "application/json")
-    public DataResponse<CmmnDeploymentResponse> getDeployments(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<CmmnDeploymentResponse> getDeployments(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         CmmnDeploymentQuery deploymentQuery = repositoryService.createDeploymentQuery();
 
         // Apply filters
@@ -144,7 +145,8 @@ public class DeploymentCollectionResource {
     @ApiOperation(value = "Create a new deployment", tags = {
             "Deployment" }, consumes = "multipart/form-data", produces = "application/json", notes = "The request body should contain data of type multipart/form-data. There should be exactly one file in the request, any additional files will be ignored. The deployment name is the name of the file-field passed in. If multiple resources need to be deployed in a single deployment, compress the resources in a zip and make sure the file-name ends with .bar or .zip.\n"
                     + "\n"
-                    + "An additional parameter (form-field) can be passed in the request body with name tenantId. The value of this field will be used as the id of the tenant this deployment is done in.")
+                    + "An additional parameter (form-field) can be passed in the request body with name tenantId. The value of this field will be used as the id of the tenant this deployment is done in.",
+            code = 201)
     @ApiResponses(value = {
             @ApiResponse(code = 201, message = "Indicates the deployment was created."),
             @ApiResponse(code = 400, message = "Indicates there was no content present in the request body or the content mime-type is not supported for deployment. The status-description contains additional information.")
@@ -154,10 +156,11 @@ public class DeploymentCollectionResource {
             @ApiImplicitParam(name = "file", dataType = "file", paramType = "form", required = true)
     })
     @PostMapping(value = "/cmmn-repository/deployments", produces = "application/json", consumes = "multipart/form-data")
+    @ResponseStatus(HttpStatus.CREATED)
     public CmmnDeploymentResponse uploadDeployment(@ApiParam(name = "deploymentKey") @RequestParam(value = "deploymentKey", required = false) String deploymentKey,
             @ApiParam(name = "deploymentName") @RequestParam(value = "deploymentName", required = false) String deploymentName,
             @ApiParam(name = "tenantId") @RequestParam(value = "tenantId", required = false) String tenantId,
-            HttpServletRequest request, HttpServletResponse response) {
+            HttpServletRequest request) {
 
         if (!(request instanceof MultipartHttpServletRequest)) {
             throw new FlowableIllegalArgumentException("Multipart request is required");
@@ -189,10 +192,17 @@ public class DeploymentCollectionResource {
             }
 
             if (fileName.endsWith(".cmmn.xml") || fileName.endsWith(".cmmn")) {
-                deploymentBuilder.addInputStream(fileName, file.getInputStream());
-            } else if (fileName.toLowerCase().endsWith(".bar") || fileName.toLowerCase()
-                    .endsWith(".zip")) {
-                deploymentBuilder.addZipInputStream(new ZipInputStream(file.getInputStream()));
+                try (final InputStream fileInputStream = file.getInputStream()) {
+                    deploymentBuilder.addInputStream(fileName, fileInputStream);
+                }
+                
+            } else if (fileName.toLowerCase().endsWith(".bar") || fileName.toLowerCase().endsWith(".zip")) {
+                try (InputStream fileInputStream = file.getInputStream();
+                        ZipInputStream zipInputStream = new ZipInputStream(fileInputStream)) {
+                    
+                    deploymentBuilder.addZipInputStream(zipInputStream);
+                }
+                
             } else {
                 throw new FlowableIllegalArgumentException("File must be of type .cmmn.xml, .cmmn, .bar or .zip");
             }
@@ -205,6 +215,7 @@ public class DeploymentCollectionResource {
                 }
 
                 deploymentBuilder.name(fileName);
+                
             } else {
                 deploymentBuilder.name(decodedQueryStrings.get("deploymentName"));
             }
@@ -222,8 +233,6 @@ public class DeploymentCollectionResource {
             }
 
             CmmnDeployment deployment = deploymentBuilder.deploy();
-
-            response.setStatus(HttpStatus.CREATED.value());
 
             return restResponseFactory.createDeploymentResponse(deployment);
 
@@ -248,11 +257,7 @@ public class DeploymentCollectionResource {
 
     protected String decode(String string) {
         if (string != null) {
-            try {
-                return URLDecoder.decode(string, "UTF-8");
-            } catch (UnsupportedEncodingException uee) {
-                throw new IllegalStateException("JVM does not support UTF-8 encoding.", uee);
-            }
+            return URLDecoder.decode(string, StandardCharsets.UTF_8);
         }
         return null;
     }

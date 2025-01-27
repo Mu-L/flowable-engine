@@ -17,7 +17,6 @@ import static org.assertj.core.api.Assertions.fail;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -69,7 +68,6 @@ import org.flowable.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.flowable.engine.impl.test.TestHelper;
 import org.flowable.engine.impl.util.CommandContextUtil;
 import org.flowable.engine.runtime.ProcessInstance;
-import org.flowable.form.api.FormRepositoryService;
 import org.flowable.idm.api.Group;
 import org.flowable.idm.api.User;
 import org.flowable.job.service.impl.asyncexecutor.AsyncExecutor;
@@ -127,8 +125,6 @@ public class BaseSpringRestTestCase {
     protected IdentityService identityService;
     protected ManagementService managementService;
     protected DynamicBpmnService dynamicBpmnService;
-    protected FormRepositoryService formRepositoryService;
-    protected org.flowable.form.api.FormService formEngineFormService;
     protected ProcessMigrationService processInstanceMigrationService;
 
     protected static CloseableHttpClient client;
@@ -176,8 +172,6 @@ public class BaseSpringRestTestCase {
         identityService = appContext.getBean(IdentityService.class);
         managementService = appContext.getBean(ManagementService.class);
         dynamicBpmnService = appContext.getBean(DynamicBpmnService.class);
-        formRepositoryService = appContext.getBean(FormRepositoryService.class);
-        formEngineFormService = appContext.getBean(org.flowable.form.api.FormService.class);
         processInstanceMigrationService = appContext.getBean(ProcessMigrationService.class);
         
         if (server == null) {
@@ -371,15 +365,7 @@ public class BaseSpringRestTestCase {
                 processEngineConfiguration,
                 TABLENAMES_EXCLUDED_FROM_DB_CLEAN_CHECK,
                 exception == null,
-                new Command<Void>() {
-                    @Override
-                    public Void execute(CommandContext commandContext) {
-                        SchemaManager schemaManager = CommandContextUtil.getProcessEngineConfiguration(commandContext).getSchemaManager();
-                        schemaManager.schemaDrop();
-                        schemaManager.schemaCreate();
-                        return null;
-                    }
-                }
+                processEngineConfiguration.getSchemaManagementCmd()
         );
     }
 
@@ -398,11 +384,7 @@ public class BaseSpringRestTestCase {
 
     protected String encode(String string) {
         if (string != null) {
-            try {
-                return URLEncoder.encode(string, "UTF-8");
-            } catch (UnsupportedEncodingException uee) {
-                throw new IllegalStateException("JVM does not support UTF-8 encoding.", uee);
-            }
+            return URLEncoder.encode(string, StandardCharsets.UTF_8);
         }
         return null;
     }
@@ -472,7 +454,10 @@ public class BaseSpringRestTestCase {
     }
 
     public boolean areJobsAvailable() {
-        return !managementService.createJobQuery().list().isEmpty();
+        if (managementService.createTimerJobQuery().list().isEmpty()) {
+            return !managementService.createJobQuery().list().isEmpty();
+        }
+        return true;
     }
 
     private static class InterruptTask extends TimerTask {

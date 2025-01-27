@@ -57,6 +57,10 @@ public interface CmmnXmlConstants {
     String ELEMENT_DEFAULT_CONTROL = "defaultControl";
 
     String ELEMENT_TASK_LISTENER = "taskListener";
+    String ATTRIBUTE_LISTENER_TYPE = "type";
+    String ELEMENT_SCRIPT = "script";
+    String ATTRIBUTE_SCRIPT_LANGUAGE = "language";
+    String ATTRIBUTE_SCRIPT_RESULTVARIABLE = "resultVariable";
     String ELEMENT_PLAN_ITEM_LIFECYCLE_LISTENER = "planItemLifecycleListener";
     String ELEMENT_CASE_LIFECYCLE_LISTENER = "caseLifecycleListener";
     String ATTRIBUTE_LISTENER_CLASS = "class";
@@ -100,6 +104,7 @@ public interface CmmnXmlConstants {
 
     String ATTRIBUTE_ID = "id";
     String ATTRIBUTE_NAME = "name";
+    String ATTRIBUTE_ELEMENT_NAME = "element-name";
     String ATTRIBUTE_INITIATOR_VARIABLE_NAME = "initiatorVariableName";
     String ATTRIBUTE_CASE_CANDIDATE_USERS = "candidateStarterUsers";
     String ATTRIBUTE_CASE_CANDIDATE_GROUPS = "candidateStarterGroups";
@@ -113,9 +118,14 @@ public interface CmmnXmlConstants {
     String ATTRIBUTE_IS_BLOCKING_EXPRESSION = "isBlockingExpression";
     String ATTRIBUTE_IS_ASYNCHRONOUS = "async";
     String ATTRIBUTE_IS_EXCLUSIVE = "exclusive";
+    String ATTRIBUTE_IS_ASYNCHRONOUS_LEAVE = "asyncLeave";
+    String ATTRIBUTE_IS_ASYNCHRONOUS_LEAVE_EXCLUSIVE = "asyncLeaveExclusive";
     String ATTRIBUTE_STORE_RESULT_AS_TRANSIENT = "storeResultVariableAsTransient";
 
     String ATTRIBUTE_EXTERNAL_WORKER_TOPIC = "topic";
+    String ATTRIBUTE_EXTERNAL_WORKER_DO_NOT_INCLUDE_VARIABLES = "doNotIncludeVariables";
+    String ELEMENT_EXTERNAL_WORKER_IN_PARAMETER = "externalWorkerInParameter";
+    String ELEMENT_EXTERNAL_WORKER_OUT_PARAMETER = "externalWorkerOutParameter";
 
     String ATTRIBUTE_IS_AUTO_COMPLETE = "autoComplete";
     String ATTRIBUTE_AUTO_COMPLETE_CONDITION = "autoCompleteCondition";
@@ -124,7 +134,7 @@ public interface CmmnXmlConstants {
     String ATTRIBUTE_INCLUDE_IN_STAGE_OVERVIEW = "includeInStageOverview";
 
     String ATTRIBUTE_MILESTONE_VARIABLE = "milestoneVariable";
-
+    String ATTRIBUTE_BUSINESS_STATUS = "businessStatus";
     String ATTRIBUTE_CASE_REF = "caseRef";
     String ATTRIBUTE_PROCESS_REF = "processRef";
     String ATTRIBUTE_DECISION_REF = "decisionRef";
@@ -150,6 +160,7 @@ public interface CmmnXmlConstants {
     String ATTRIBUTE_IOPARAMETER_SOURCE_EXPRESSION = "sourceExpression";
     String ATTRIBUTE_IOPARAMETER_TARGET = "target";
     String ATTRIBUTE_IOPARAMETER_TARGET_EXPRESSION = "targetExpression";
+    String ATTRIBUTE_IOPARAMETER_TRANSIENT = "transient";
 
     String ELEMENT_TIMER_EXPRESSION = "timerExpression";
     String ELEMENT_PLAN_ITEM_START_TRIGGER = "planItemStartTrigger";
@@ -190,8 +201,10 @@ public interface CmmnXmlConstants {
     String ATTRIBUTE_DUE_DATE = "dueDate";
     String ATTRIBUTE_CATEGORY = "category";
     String ATTRIBUTE_TASK_ID_VARIABLE_NAME = "taskIdVariableName";
+    String ATTRIBUTE_TASK_COMPLETER_VARIABLE_NAME = "taskCompleterVariableName";
 
     String ATTRIBUTE_REPETITION_COUNTER_VARIABLE_NAME = "counterVariable";
+    String ATTRIBUTE_IGNORE_REPETITION_COUNTER_VARIABLE = "ignoreCounterVariable";
     String ATTRIBUTE_REPETITION_MAX_INSTANCE_COUNT_NAME = "maxInstanceCount";
     String ATTRIBUTE_REPETITION_COLLECTION_VARIABLE_NAME = "collectionVariable";
     String ATTRIBUTE_REPETITION_ELEMENT_VARIABLE_NAME = "elementVariable";
@@ -213,6 +226,7 @@ public interface CmmnXmlConstants {
     String ELEMENT_EVENT_OUT_PARAMETER = "eventOutParameter";
     String START_EVENT_CORRELATION_CONFIGURATION = "startEventCorrelationConfiguration";
     String START_EVENT_CORRELATION_STORE_AS_UNIQUE_REFERENCE_ID = "storeAsUniqueReferenceId";
+    String START_EVENT_CORRELATION_MANUAL = "manualSubscription";
 
     String ELEMENT_VARIABLE_AGGREGATION = "variableAggregation";
     String ATTRIBUTE_VARIABLE_AGGREGATION_VARIABLE = "variable";
@@ -234,5 +248,6 @@ public interface CmmnXmlConstants {
     String ATTRIBUTE_DI_HEIGHT = "height";
     String ATTRIBUTE_DI_X = "x";
     String ATTRIBUTE_DI_Y = "y";
+    String ATTRIBUTE_DI_ROTATION = "rotation";
 
 }

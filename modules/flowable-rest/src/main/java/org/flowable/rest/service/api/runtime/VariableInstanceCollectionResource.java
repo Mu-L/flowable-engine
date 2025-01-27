@@ -15,8 +15,6 @@ package org.flowable.rest.service.api.runtime;
 
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.flowable.common.rest.api.DataResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -43,6 +41,7 @@ public class VariableInstanceCollectionResource extends VariableInstanceBaseReso
             @ApiImplicitParam(name = "processInstanceId", dataType = "string", value = "The process instance id of the variable instance.", paramType = "query"),
             @ApiImplicitParam(name = "taskId", dataType = "string", value = "The task id of the variable instance.", paramType = "query"),
             @ApiImplicitParam(name = "excludeTaskVariables", dataType = "boolean", value = "Indication to exclude the task variables from the result.", paramType = "query"),
+            @ApiImplicitParam(name = "excludeLocalVariables", dataType = "boolean", value = "Indication to exclude local variables or not.", paramType = "query"),
             @ApiImplicitParam(name = "variableName", dataType = "string", value = "The variable name of the variable instance.", paramType = "query"),
             @ApiImplicitParam(name = "variableNameLike", dataType = "string", value = "The variable name using the like operator for the variable instance.", paramType = "query")
     })
@@ -50,7 +49,7 @@ public class VariableInstanceCollectionResource extends VariableInstanceBaseReso
             @ApiResponse(code = 200, message = "Indicates that variable instances could be queried."),
             @ApiResponse(code = 400, message = "Indicates an parameter was passed in the wrong format. The status-message contains additional information.") })
     @GetMapping(value = "/runtime/variable-instances", produces = "application/json")
-    public DataResponse<VariableInstanceResponse> getHistoricActivityInstances(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<VariableInstanceResponse> getHistoricActivityInstances(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         VariableInstanceQueryRequest query = new VariableInstanceQueryRequest();
 
         // Populate query based on request
@@ -78,6 +77,10 @@ public class VariableInstanceCollectionResource extends VariableInstanceBaseReso
             query.setVariableNameLike(allRequestParams.get("variableNameLike"));
         }
         
+        if (allRequestParams.get("excludeLocalVariables") != null) {
+            query.setExcludeLocalVariables(Boolean.valueOf(allRequestParams.get("excludeLocalVariables")));
+        }
+
         return getQueryResponse(query, allRequestParams);
     }
 }

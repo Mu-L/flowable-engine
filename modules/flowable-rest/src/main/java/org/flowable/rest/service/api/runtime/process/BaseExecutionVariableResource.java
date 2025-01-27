@@ -17,10 +17,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.Collections;
 import java.util.Map;
-
-import javax.annotation.PostConstruct;
-import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
 import org.flowable.common.engine.api.FlowableException;
@@ -29,21 +27,23 @@ import org.flowable.common.engine.api.FlowableObjectNotFoundException;
 import org.flowable.common.rest.exception.FlowableContentNotSupportedException;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.runtime.Execution;
-import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.rest.service.api.BpmnRestApiInterceptor;
 import org.flowable.rest.service.api.RestResponseFactory;
 import org.flowable.rest.service.api.engine.variable.RestVariable;
 import org.flowable.rest.service.api.engine.variable.RestVariable.RestVariableScope;
 import org.flowable.variable.service.impl.persistence.entity.VariableInstanceEntity;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 /**
  * @author Frederik Heremans
  */
-public class BaseExecutionVariableResource {
+public class BaseExecutionVariableResource implements InitializingBean {
 
     @Autowired
     protected Environment env;
@@ -59,8 +59,14 @@ public class BaseExecutionVariableResource {
 
     protected boolean isSerializableVariableAllowed;
 
-    @PostConstruct
-    protected void postConstruct() {
+    protected final int variableType;
+
+    public BaseExecutionVariableResource(int variableType) {
+        this.variableType = variableType;
+    }
+
+    @Override
+    public void afterPropertiesSet() {
         isSerializableVariableAllowed = env.getProperty("rest.variables.allow.serializable", Boolean.class, true);
     }
 
@@ -93,7 +99,7 @@ public class BaseExecutionVariableResource {
         }
     }
 
-    protected RestVariable setBinaryVariable(MultipartHttpServletRequest request, Execution execution, int responseVariableType, boolean isNew) {
+    protected RestVariable setBinaryVariable(MultipartHttpServletRequest request, Execution execution, boolean isNew, boolean async) {
 
         // Validate input and set defaults
         if (request.getFileMap().size() == 0) {
@@ -151,23 +157,29 @@ public class BaseExecutionVariableResource {
             if (variableType.equals(RestResponseFactory.BYTE_ARRAY_VARIABLE_TYPE)) {
                 // Use raw bytes as variable value
                 byte[] variableBytes = IOUtils.toByteArray(file.getInputStream());
-                setVariable(execution, variableName, variableBytes, scope, isNew);
+                setVariable(execution, variableName, variableBytes, scope, isNew, async);
 
             } else if (isSerializableVariableAllowed) {
                 // Try deserializing the object
                 ObjectInputStream stream = new ObjectInputStream(file.getInputStream());
                 Object value = stream.readObject();
-                setVariable(execution, variableName, value, scope, isNew);
+                setVariable(execution, variableName, value, scope, isNew, async);
                 stream.close();
+                
             } else {
                 throw new FlowableContentNotSupportedException("Serialized objects are not allowed");
             }
 
-            if (responseVariableType == RestResponseFactory.VARIABLE_PROCESS) {
-                return restResponseFactory.createBinaryRestVariable(variableName, scope, variableType, null, null, execution.getId());
-            } else {
-                return restResponseFactory.createBinaryRestVariable(variableName, scope, variableType, null, execution.getId(), null);
+            RestVariable variable = null;
+            
+            if (!async) {
+                variable = getVariableFromRequestWithoutAccessCheck(execution, variableName, scope, false);
+                
+                // We are setting the scope because the fetched variable does not have it
+                variable.setVariableScope(scope);
             }
+            
+            return variable;
 
         } catch (IOException ioe) {
             throw new FlowableIllegalArgumentException("Could not process multipart content", ioe);
@@ -177,24 +189,29 @@ public class BaseExecutionVariableResource {
 
     }
 
-    protected RestVariable setSimpleVariable(RestVariable restVariable, Execution execution, boolean isNew) {
+    protected RestVariable setSimpleVariable(RestVariable restVariable, Execution execution, boolean isNew, boolean async) {
         if (restVariable.getName() == null) {
             throw new FlowableIllegalArgumentException("Variable name is required");
         }
 
-        // Figure out scope, revert to local is omitted
+        // Figure out scope, revert to local if omitted
         RestVariableScope scope = restVariable.getVariableScope();
         if (scope == null) {
             scope = RestVariableScope.LOCAL;
         }
 
         Object actualVariableValue = restResponseFactory.getVariableValue(restVariable);
-        setVariable(execution, restVariable.getName(), actualVariableValue, scope, isNew);
+        setVariable(execution, restVariable.getName(), actualVariableValue, scope, isNew, async);
 
-        return constructRestVariable(restVariable.getName(), actualVariableValue, scope, execution.getId(), false);
+        RestVariable newRestVariable = null;
+        if (!async) {
+            newRestVariable = getVariableFromRequestWithoutAccessCheck(execution, restVariable.getName(), scope, false);
+        }
+        
+        return newRestVariable;
     }
 
-    protected void setVariable(Execution execution, String name, Object value, RestVariableScope scope, boolean isNew) {
+    protected void setVariable(Execution execution, String name, Object value, RestVariableScope scope, boolean isNew, boolean async) {
         // Create can only be done on new variables. Existing variables should
         // be updated using PUT
         boolean hasVariable = hasVariableOnScope(execution, name, scope);
@@ -206,13 +223,33 @@ public class BaseExecutionVariableResource {
             throw new FlowableObjectNotFoundException("Execution '" + execution.getId() + "' does not have a variable with name: '" + name + "'.", null);
         }
 
-        if (scope == RestVariableScope.LOCAL) {
-            runtimeService.setVariableLocal(execution.getId(), name, value);
-        } else {
-            if (execution.getParentId() != null) {
-                runtimeService.setVariable(execution.getParentId(), name, value);
+        if (restApiInterceptor != null) {
+            if (isNew) {
+                restApiInterceptor.createExecutionVariables(execution, Collections.singletonMap(name, value), scope);
             } else {
-                runtimeService.setVariable(execution.getId(), name, value);
+                restApiInterceptor.updateExecutionVariables(execution, Collections.singletonMap(name, value), scope);
+            }
+        }
+
+        if (scope == RestVariableScope.LOCAL) {
+            if (async) {
+                runtimeService.setVariableLocalAsync(execution.getId(), name, value);
+            } else {
+                runtimeService.setVariableLocal(execution.getId(), name, value);
+            }
+        } else {
+            String executionId = null;
+            if (execution.getParentId() != null) {
+                executionId = execution.getParentId();
+                
+            } else {
+                executionId = execution.getId();
+            }
+            
+            if (async) {
+                runtimeService.setVariableAsync(executionId, name, value);
+            } else {
+                runtimeService.setVariable(executionId, name, value);
             }
         }
     }
@@ -235,14 +272,23 @@ public class BaseExecutionVariableResource {
 
     public RestVariable getVariableFromRequest(Execution execution, String variableName, String scope, boolean includeBinary) {
 
-        boolean variableFound = false;
-        Object value = null;
-
         if (execution == null) {
             throw new FlowableObjectNotFoundException("Could not find an execution", Execution.class);
         }
 
         RestVariableScope variableScope = RestVariable.getScopeFromString(scope);
+        if (restApiInterceptor != null) {
+            restApiInterceptor.accessExecutionVariable(execution, variableName, scope);
+        }
+
+        return getVariableFromRequestWithoutAccessCheck(execution, variableName, variableScope, includeBinary);
+    }
+
+    public RestVariable getVariableFromRequestWithoutAccessCheck(Execution execution, String variableName, RestVariableScope variableScope, boolean includeBinary) {
+
+        boolean variableFound = false;
+        Object value = null;
+
         if (variableScope == null) {
             // First, check local variables (which have precedence when no scope
             // is supplied)
@@ -280,33 +326,13 @@ public class BaseExecutionVariableResource {
 
     protected RestVariable constructRestVariable(String variableName, Object value, RestVariableScope variableScope, String executionId, boolean includeBinary) {
 
-        return restResponseFactory.createRestVariable(variableName, value, variableScope, executionId, RestResponseFactory.VARIABLE_EXECUTION, includeBinary);
+        return restResponseFactory.createRestVariable(variableName, value, variableScope, executionId, variableType, includeBinary);
     }
 
-    /**
-     * Get valid execution from request. Throws exception if execution does not exist or if execution id is not provided.
-     */
-    protected Execution getExecutionFromRequest(String executionId) {
+    protected Execution getExecutionFromRequestWithoutAccessCheck(String executionId) {
         Execution execution = runtimeService.createExecutionQuery().executionId(executionId).singleResult();
         if (execution == null) {
             throw new FlowableObjectNotFoundException("Could not find an execution with id '" + executionId + "'.", Execution.class);
-        }
-        
-        if (restApiInterceptor != null) {
-            restApiInterceptor.accessExecutionInfoById(execution);
-        }
-        
-        return execution;
-    }
-
-    protected Execution getProcessInstanceFromRequest(String processInstanceId) {
-        Execution execution = runtimeService.createProcessInstanceQuery().processInstanceId(processInstanceId).singleResult();
-        if (execution == null) {
-            throw new FlowableObjectNotFoundException("Could not find a process instance with id '" + processInstanceId + "'.", ProcessInstance.class);
-        }
-        
-        if (restApiInterceptor != null) {
-            restApiInterceptor.accessProcessInstanceInfoById((ProcessInstance) execution);
         }
         
         return execution;

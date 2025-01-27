@@ -38,6 +38,7 @@ public interface Problems {
     String SEQ_FLOW_INVALID_TARGET = "flowable-seq-flow-invalid-target";
 
     String USER_TASK_LISTENER_IMPLEMENTATION_MISSING = "flowable-usertask-listener-implementation-missing";
+    String USER_TASK_LISTENER_MISSING_EVENT = "flowable-usertask-listener-event-missing";
 
     String SERVICE_TASK_INVALID_TYPE = "flowable-servicetask-invalid-type";
     String SERVICE_TASK_RESULT_VAR_NAME_WITH_DELEGATE = "flowable-servicetask-result-var-name-with-delegate";
@@ -89,6 +90,7 @@ public interface Problems {
     String SUBPROCESS_START_EVENT_EVENT_DEFINITION_NOT_ALLOWED = "flowable-subprocess-start-event-event-definition-not-allowed";
 
     String EVENT_SUBPROCESS_INVALID_START_EVENT_DEFINITION = "flowable-event-subprocess-invalid-start-event-definition";
+    String EVENT_SUBPROCESS_INVALID_START_EVENT_VARIABLE_NAME = "flowable-event-subprocess-invalid-start-event-variable-name";
     String EVENT_SUBPROCESS_BOUNDARY_EVENT = "flowable-event-subprocess-boundary-event";
 
     String BOUNDARY_EVENT_NO_EVENT_DEFINITION = "flowable-boundary-event-no-event-definition";

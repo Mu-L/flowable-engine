@@ -42,6 +42,7 @@ public class VariableInstanceEntityImpl extends AbstractVariableServiceEntity im
     protected String scopeId;
     protected String subScopeId;
     protected String scopeType;
+    protected String scopeDefinitionId;
 
     protected Long longValue;
     protected Double doubleValue;
@@ -49,13 +50,12 @@ public class VariableInstanceEntityImpl extends AbstractVariableServiceEntity im
     protected String textValue2;
     protected ByteArrayRef byteArrayRef;
 
+    protected String metaInfo;
+
     protected Object cachedValue;
     protected boolean forcedUpdate;
     protected boolean deleted;
 
-    public VariableInstanceEntityImpl() {
-
-    }
 
     @Override
     public Object getPersistentState() {
@@ -75,6 +75,7 @@ public class VariableInstanceEntityImpl extends AbstractVariableServiceEntity im
         if (byteArrayRef != null && byteArrayRef.getId() != null) {
             persistentState.put("byteArrayValueId", byteArrayRef.getId());
         }
+        persistentState.put("metaInfo", metaInfo);
         if (forcedUpdate) {
             persistentState.put("forcedUpdate", Boolean.TRUE);
         }
@@ -237,6 +238,16 @@ public class VariableInstanceEntityImpl extends AbstractVariableServiceEntity im
     }
 
     @Override
+    public void setScopeDefinitionId(String scopeDefinitionId) {
+        this.scopeDefinitionId = scopeDefinitionId;
+    }
+
+    @Override
+    public String getScopeDefinitionId() {
+        return scopeDefinitionId;
+    }
+
+    @Override
     public Long getLongValue() {
         return longValue;
     }
@@ -277,6 +288,16 @@ public class VariableInstanceEntityImpl extends AbstractVariableServiceEntity im
     }
 
     @Override
+    public String getMetaInfo() {
+        return metaInfo;
+    }
+
+    @Override
+    public void setMetaInfo(String metaInfo) {
+        this.metaInfo = metaInfo;
+    }
+
+    @Override
     public Object getCachedValue() {
         return cachedValue;
     }
@@ -303,6 +324,27 @@ public class VariableInstanceEntityImpl extends AbstractVariableServiceEntity im
         sb.append("id=").append(id);
         sb.append(", name=").append(name);
         sb.append(", type=").append(type != null ? type.getTypeName() : "null");
+        if (executionId != null) {
+            sb.append(", executionId=").append(executionId);
+        }
+        if (processInstanceId != null) {
+            sb.append(", processInstanceId=").append(processInstanceId);
+        }
+        if (processDefinitionId != null) {
+            sb.append(", processDefinitionId=").append(processDefinitionId);
+        }
+        if (scopeId != null) {
+            sb.append(", scopeId=").append(scopeId);
+        }
+        if (subScopeId != null) {
+            sb.append(", subScopeId=").append(subScopeId);
+        }
+        if (scopeType != null) {
+            sb.append(", scopeType=").append(scopeType);
+        }
+        if (scopeDefinitionId != null) {
+            sb.append(", scopeDefinitionId=").append(scopeDefinitionId);
+        }
         if (longValue != null) {
             sb.append(", longValue=").append(longValue);
         }

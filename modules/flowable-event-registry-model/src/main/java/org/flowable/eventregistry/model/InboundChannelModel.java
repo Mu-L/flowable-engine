@@ -23,6 +23,7 @@ public class InboundChannelModel extends ChannelModel {
 
     protected String contextExtractorDelegateExpression;
     protected String deserializerDelegateExpression;
+    protected String eventFilterDelegateExpression;
     protected String payloadExtractorDelegateExpression;
     protected String headerExtractorDelegateExpression;
     protected String eventTransformerDelegateExpression;
@@ -46,6 +47,14 @@ public class InboundChannelModel extends ChannelModel {
 
     public void setDeserializerType(String deserializerType) {
         this.deserializerType = deserializerType;
+    }
+
+    public String getEventFilterDelegateExpression() {
+        return eventFilterDelegateExpression;
+    }
+
+    public void setEventFilterDelegateExpression(String eventFilterDelegateExpression) {
+        this.eventFilterDelegateExpression = eventFilterDelegateExpression;
     }
 
     public String getContextExtractorDelegateExpression() {
@@ -128,29 +137,4 @@ public class InboundChannelModel extends ChannelModel {
         this.inboundEventChannelAdapter = inboundEventChannelAdapter;
     }
 
-    @JsonIgnore
-    public String getChannelModelHashKey() {
-        StringBuilder keyDetectionStringBuilder = new StringBuilder();
-        if (channelEventKeyDetection != null) {
-            keyDetectionStringBuilder.append(channelEventKeyDetection.getDelegateExpression())
-                    .append(channelEventKeyDetection.getFixedValue())
-                    .append(channelEventKeyDetection.getJsonField())
-                    .append(channelEventKeyDetection.getJsonPointerExpression())
-                    .append(channelEventKeyDetection.getXmlXPathExpression());
-        }
-        
-        StringBuilder tenantIdDetectionStringBuilder = new StringBuilder();
-        if (channelEventTenantIdDetection != null) {
-            tenantIdDetectionStringBuilder.append(channelEventTenantIdDetection.getDelegateExpression())
-                    .append(channelEventTenantIdDetection.getFixedValue())
-                    .append(channelEventTenantIdDetection.getJsonPointerExpression())
-                    .append(channelEventTenantIdDetection.getxPathExpression());
-        }
-        
-        return new StringBuilder().append(type).append(deserializerType).append(contextExtractorDelegateExpression)
-                .append(deserializerDelegateExpression).append(payloadExtractorDelegateExpression)
-                .append(headerExtractorDelegateExpression).append(eventTransformerDelegateExpression)
-                .append(pipelineDelegateExpression).append(keyDetectionStringBuilder.toString())
-                .append(tenantIdDetectionStringBuilder.toString()).toString();
-    }
 }

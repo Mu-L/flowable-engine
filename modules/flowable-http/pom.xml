@@ -10,16 +10,17 @@
         <groupId>org.flowable</groupId>
         <artifactId>flowable-root</artifactId>
         <relativePath>../..</relativePath>
-        <version>6.7.3-SNAPSHOT</version>
+        <version>7.1.1-SNAPSHOT</version>
     </parent>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jetty.version>9.4.46.v20220331</jetty.version>
+        <jetty.version>12.0.15</jetty.version>
         <flowable.osgi.import.pkg>*</flowable.osgi.import.pkg>
         <flowable.artifact>
             org.flowable.http
         </flowable.artifact>
+        <skip.test.db.drop>false</skip.test.db.drop>
     </properties>
 
     <build>
@@ -113,12 +114,18 @@
             <artifactId>flowable-http-common</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpmime</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.flowable</groupId>
@@ -145,14 +152,14 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-servlet</artifactId>
-            <version>${jetty.version}</version>
-            <scope>test</scope>
+        	<groupId>org.eclipse.jetty.ee10</groupId>
+        	<artifactId>jetty-ee10-servlet</artifactId>
+        	<version>${jetty.version}</version>
+        	<scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -218,13 +225,32 @@
             <artifactId>spring-webflux</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+            The SpringWebClientFlowableHttpClient is using ReactorClientHttpConnector,
+            which since Spring Framework 6.1 is implementing SmartLifecycle and thus needs spring-context.
+            See https://github.com/spring-projects/spring-framework/issues/31180#issuecomment-1934453468 for more information.
+         -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>io.projectreactor.netty</groupId>
             <artifactId>reactor-netty</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.groovy</groupId>
+            <artifactId>groovy-jsr223</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjdk.nashorn</groupId>
+            <artifactId>nashorn-core</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
-
     <reporting>
         <plugins>
             <plugin>

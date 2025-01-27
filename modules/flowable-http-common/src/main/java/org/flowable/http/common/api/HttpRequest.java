@@ -12,7 +12,10 @@
  */
 package org.flowable.http.common.api;
 
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.Collection;
+
+import org.flowable.common.engine.api.FlowableIllegalStateException;
 
 /**
  * @author Harsha Teja Kanna.
@@ -24,16 +27,9 @@ public class HttpRequest {
     protected HttpHeaders httpHeaders;
     protected String body;
     protected String bodyEncoding;
+    protected Collection<MultiValuePart> multiValueParts;
     protected int timeout;
     protected boolean noRedirects;
-    protected Set<String> failCodes;
-    protected Set<String> handleCodes;
-    protected boolean ignoreErrors;
-    protected boolean saveRequest;
-    protected boolean saveResponse;
-    protected boolean saveResponseTransient;
-    protected boolean saveResponseAsJson;
-    protected String prefix;
 
     public String getMethod() {
         return method;
@@ -69,6 +65,9 @@ public class HttpRequest {
     }
 
     public void setBody(String body) {
+        if (multiValueParts != null && !multiValueParts.isEmpty()) {
+            throw new FlowableIllegalStateException("Cannot set both body and multi value parts");
+        }
         this.body = body;
     }
 
@@ -78,6 +77,20 @@ public class HttpRequest {
 
     public void setBodyEncoding(String bodyEncoding) {
         this.bodyEncoding = bodyEncoding;
+    }
+
+    public Collection<MultiValuePart> getMultiValueParts() {
+        return multiValueParts;
+    }
+
+    public void addMultiValuePart(MultiValuePart part) {
+        if (body != null) {
+            throw new FlowableIllegalStateException("Cannot set both body and multi value parts");
+        }
+        if (multiValueParts == null) {
+            multiValueParts = new ArrayList<>();
+        }
+        multiValueParts.add(part);
     }
 
     public int getTimeout() {
@@ -96,67 +109,4 @@ public class HttpRequest {
         this.noRedirects = noRedirects;
     }
 
-    public Set<String> getFailCodes() {
-        return failCodes;
-    }
-
-    public void setFailCodes(Set<String> failCodes) {
-        this.failCodes = failCodes;
-    }
-
-    public Set<String> getHandleCodes() {
-        return handleCodes;
-    }
-
-    public void setHandleCodes(Set<String> handleCodes) {
-        this.handleCodes = handleCodes;
-    }
-
-    public boolean isIgnoreErrors() {
-        return ignoreErrors;
-    }
-
-    public void setIgnoreErrors(boolean ignoreErrors) {
-        this.ignoreErrors = ignoreErrors;
-    }
-
-    public boolean isSaveRequest() {
-        return saveRequest;
-    }
-
-    public void setSaveRequest(boolean saveRequest) {
-        this.saveRequest = saveRequest;
-    }
-
-    public boolean isSaveResponse() {
-        return saveResponse;
-    }
-
-    public void setSaveResponse(boolean saveResponse) {
-        this.saveResponse = saveResponse;
-    }
-    
-    public boolean isSaveResponseTransient() {
-        return saveResponseTransient;
-    }
-
-    public void setSaveResponseTransient(boolean saveResponseTransient) {
-        this.saveResponseTransient = saveResponseTransient;
-    }
-    
-    public boolean isSaveResponseAsJson() {
-        return saveResponseAsJson;
-    }
-
-    public void setSaveResponseAsJson(boolean saveResponseAsJson) {
-        this.saveResponseAsJson = saveResponseAsJson;
-    }
-
-    public String getPrefix() {
-        return prefix;
-    }
-
-    public void setPrefix(String prefix) {
-        this.prefix = prefix;
-    }
 }

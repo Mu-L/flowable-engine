@@ -56,7 +56,7 @@ public class PlanItemInstanceBaseResource {
     @Autowired(required=false)
     protected CmmnRestApiInterceptor restApiInterceptor;
 
-    protected DataResponse<PlanItemInstanceResponse> getQueryResponse(PlanItemInstanceQueryRequest queryRequest, Map<String, String> requestParams, String serverRootUrl) {
+    protected DataResponse<PlanItemInstanceResponse> getQueryResponse(PlanItemInstanceQueryRequest queryRequest, Map<String, String> requestParams) {
 
         PlanItemInstanceQuery query = runtimeService.createPlanItemInstanceQuery();
 
@@ -106,7 +106,12 @@ public class PlanItemInstanceBaseResource {
         if (queryRequest.getStartUserId() != null) {
             query.planItemInstanceStartUserId(queryRequest.getStartUserId());
         }
-
+        if (queryRequest.getIncludeEnded() != null && queryRequest.getIncludeEnded()) {
+            query.includeEnded();
+        }
+        if (queryRequest.getIncludeLocalVariables() != null && queryRequest.getIncludeLocalVariables()) {
+            query.includeLocalVariables();
+        }
         if (queryRequest.getVariables() != null) {
             addVariables(query, queryRequest.getVariables(), false);
         }
@@ -204,7 +209,7 @@ public class PlanItemInstanceBaseResource {
     }
 
     protected PlanItemInstance getPlanItemInstanceFromRequest(String planItemInstanceId) {
-        PlanItemInstance planItemInstance = runtimeService.createPlanItemInstanceQuery().planItemInstanceId(planItemInstanceId).singleResult();
+        PlanItemInstance planItemInstance = runtimeService.createPlanItemInstanceQuery().planItemInstanceId(planItemInstanceId).includeEnded().singleResult();
         if (planItemInstance == null) {
             throw new FlowableObjectNotFoundException("Could not find an plan item instance with id '" + planItemInstanceId + "'.", PlanItemInstance.class);
         }

@@ -12,6 +12,7 @@
  */
 package org.flowable.cmmn.engine.impl.persistence.entity.data.impl;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.flowable.cmmn.api.history.HistoricPlanItemInstance;
@@ -29,7 +30,7 @@ import org.flowable.common.engine.impl.persistence.cache.CachedEntityMatcherAdap
  */
 public class MybatisHistoricPlanItemInstanceDataManager extends AbstractCmmnDataManager<HistoricPlanItemInstanceEntity> implements HistoricPlanItemInstanceDataManager {
 
-    protected CachedEntityMatcherAdapter<HistoricPlanItemInstanceEntity> historicPlanItemInstanceByCaseDefinitionIdMatcher = new CachedEntityMatcherAdapter<HistoricPlanItemInstanceEntity>() {
+    protected CachedEntityMatcherAdapter<HistoricPlanItemInstanceEntity> historicPlanItemInstanceByCaseDefinitionIdMatcher = new CachedEntityMatcherAdapter<>() {
         @Override
         public boolean isRetained(HistoricPlanItemInstanceEntity entity, Object param) {
             return entity.getCaseDefinitionId().equals(param);
@@ -66,8 +67,21 @@ public class MybatisHistoricPlanItemInstanceDataManager extends AbstractCmmnData
     }
     
     @Override
+    public void bulkDeleteHistoricPlanItemInstancesForCaseInstanceIds(Collection<String> caseInstanceIds) {
+        getDbSqlSession().delete("bulkDeleteHistoricPlanItemInstancesByCaseInstanceIds", createSafeInValuesList(caseInstanceIds), getManagedEntityClass());
+    }
+    
+    @Override
     public void deleteHistoricPlanItemInstancesForNonExistingCaseInstances() {
         getDbSqlSession().delete("bulkDeleteHistoricPlanItemInstancesForNonExistingCaseInstances", null, getManagedEntityClass());
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<HistoricPlanItemInstance> findWithVariablesByCriteria(HistoricPlanItemInstanceQueryImpl historicPlanItemInstanceQuery) {
+        setSafeInValueLists(historicPlanItemInstanceQuery);
+        return getDbSqlSession().selectList("selectHistoricPlanItemInstancesWithLocalVariablesByQueryCriteria", historicPlanItemInstanceQuery,
+                getManagedEntityClass());
     }
 
     @Override

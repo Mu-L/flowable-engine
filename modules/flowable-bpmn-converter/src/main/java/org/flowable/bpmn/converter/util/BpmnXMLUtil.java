@@ -37,6 +37,7 @@ import org.flowable.bpmn.converter.child.DataInputAssociationParser;
 import org.flowable.bpmn.converter.child.DataOutputAssociationParser;
 import org.flowable.bpmn.converter.child.DataStateParser;
 import org.flowable.bpmn.converter.child.DocumentationParser;
+import org.flowable.bpmn.converter.child.ElementNameParser;
 import org.flowable.bpmn.converter.child.ErrorEventDefinitionParser;
 import org.flowable.bpmn.converter.child.EscalationEventDefinitionParser;
 import org.flowable.bpmn.converter.child.ExecutionListenerParser;
@@ -49,8 +50,11 @@ import org.flowable.bpmn.converter.child.FlowableHttpResponseHandlerParser;
 import org.flowable.bpmn.converter.child.FlowableMapExceptionParser;
 import org.flowable.bpmn.converter.child.FormPropertyParser;
 import org.flowable.bpmn.converter.child.IOSpecificationParser;
+import org.flowable.bpmn.converter.child.InParameterParser;
 import org.flowable.bpmn.converter.child.MessageEventDefinitionParser;
 import org.flowable.bpmn.converter.child.MultiInstanceParser;
+import org.flowable.bpmn.converter.child.OutParameterParser;
+import org.flowable.bpmn.converter.child.ScriptInfoParser;
 import org.flowable.bpmn.converter.child.SignalEventDefinitionParser;
 import org.flowable.bpmn.converter.child.TaskListenerParser;
 import org.flowable.bpmn.converter.child.TerminateEventDefinitionParser;
@@ -62,6 +66,7 @@ import org.flowable.bpmn.model.BaseElement;
 import org.flowable.bpmn.model.BpmnModel;
 import org.flowable.bpmn.model.ExtensionAttribute;
 import org.flowable.bpmn.model.ExtensionElement;
+import org.flowable.bpmn.model.FlowElement;
 import org.flowable.bpmn.model.GraphicInfo;
 import org.flowable.bpmn.model.IOParameter;
 
@@ -83,6 +88,7 @@ public class BpmnXMLUtil implements BpmnXMLConstants {
         addGenericParser(new EscalationEventDefinitionParser());
         addGenericParser(new ExecutionListenerParser());
         addGenericParser(new FieldExtensionParser());
+        addGenericParser(new ScriptInfoParser());
         addGenericParser(new FlowableEventListenerParser());
         addGenericParser(new FlowableHttpRequestHandlerParser());
         addGenericParser(new FlowableHttpResponseHandlerParser());
@@ -100,6 +106,7 @@ public class BpmnXMLUtil implements BpmnXMLConstants {
         addGenericParser(new FlowNodeRefParser());
         addGenericParser(new FlowableFailedjobRetryParser());
         addGenericParser(new FlowableMapExceptionParser());
+        addGenericParser(new ElementNameParser());
     }
 
     private static void addGenericParser(BaseChildElementParser parser) {
@@ -208,6 +215,9 @@ public class BpmnXMLUtil implements BpmnXMLConstants {
         String attributeValue = xtr.getAttributeValue(FLOWABLE_EXTENSIONS_NAMESPACE, attributeName);
         if (attributeValue == null) {
             attributeValue = xtr.getAttributeValue(ACTIVITI_EXTENSIONS_NAMESPACE, attributeName);
+            if (attributeValue == null) {
+                attributeValue = xtr.getAttributeValue(CAMUNDA_EXTENSIONS_NAMESPACE, attributeName);
+            }
         }
 
         return attributeValue;
@@ -401,10 +411,26 @@ public class BpmnXMLUtil implements BpmnXMLConstants {
             xtw.writeEndElement();
         }
     }
+
+    public static boolean writeElementNameExtensionElement(FlowElement element, boolean didWriteExtensionStartElement, XMLStreamWriter xtw) throws Exception {
+        String name = element.getName();
+        if (BpmnXMLUtil.containsNewLine(name)) {
+            if (!didWriteExtensionStartElement) {
+                xtw.writeStartElement(ELEMENT_EXTENSIONS);
+                didWriteExtensionStartElement = true;
+            }
+
+            xtw.writeStartElement(FLOWABLE_EXTENSIONS_PREFIX, ATTRIBUTE_ELEMENT_NAME, FLOWABLE_EXTENSIONS_NAMESPACE);
+            xtw.writeCharacters(element.getName());
+            xtw.writeEndElement();
+        }
+
+        return didWriteExtensionStartElement;
+    }
     
     public static boolean writeIOParameters(String elementName, List<IOParameter> parameterList, boolean didWriteExtensionStartElement, XMLStreamWriter xtw) throws Exception {
 
-        if (parameterList.isEmpty()) {
+        if (parameterList == null || parameterList.isEmpty()) {
             return didWriteExtensionStartElement;
         }
 
@@ -422,8 +448,8 @@ public class BpmnXMLUtil implements BpmnXMLConstants {
                 writeDefaultAttribute(ATTRIBUTE_IOPARAMETER_SOURCE, ioParameter.getSource(), xtw);
             }
             
-            if (StringUtils.isNotEmpty(ioParameter.getAttributeValue(null, "sourceType"))) {
-                writeDefaultAttribute("sourceType", ioParameter.getAttributeValue(null, "sourceType"), xtw);
+            if (StringUtils.isNotEmpty(ioParameter.getAttributeValue(null, ATTRIBUTE_IOPARAMETER_SOURCE_TYPE))) {
+                writeDefaultAttribute(ATTRIBUTE_IOPARAMETER_SOURCE_TYPE, ioParameter.getAttributeValue(null, ATTRIBUTE_IOPARAMETER_SOURCE_TYPE), xtw);
             }
             
             if (StringUtils.isNotEmpty(ioParameter.getTargetExpression())) {
@@ -433,13 +459,16 @@ public class BpmnXMLUtil implements BpmnXMLConstants {
                 writeDefaultAttribute(ATTRIBUTE_IOPARAMETER_TARGET, ioParameter.getTarget(), xtw);
             }
             
-            if (StringUtils.isNotEmpty(ioParameter.getAttributeValue(null, "targetType"))) {
-                writeDefaultAttribute("targetType", ioParameter.getAttributeValue(null, "targetType"), xtw);
+            if (StringUtils.isNotEmpty(ioParameter.getAttributeValue(null, ATTRIBUTE_IOPARAMETER_TARGET_TYPE))) {
+                writeDefaultAttribute(ATTRIBUTE_IOPARAMETER_TARGET_TYPE, ioParameter.getAttributeValue(null, ATTRIBUTE_IOPARAMETER_TARGET_TYPE), xtw);
             }
             
             if (ioParameter.isTransient()) {
                 writeDefaultAttribute(ATTRIBUTE_IOPARAMETER_TRANSIENT, "true", xtw);
             }
+
+            writeCustomAttributes(ioParameter.getAttributes().values(), xtw,
+                    InParameterParser.defaultInParameterAttributes, OutParameterParser.defaultOutParameterAttributes);
 
             xtw.writeEndElement();
         }
@@ -564,7 +593,8 @@ public class BpmnXMLUtil implements BpmnXMLConstants {
                 for (ExtensionAttribute blackAttribute : blackList) {
                     if (blackAttribute.getName().equals(attribute.getName())) {
                         if (attribute.getNamespace() != null && (FLOWABLE_EXTENSIONS_NAMESPACE.equals(attribute.getNamespace()) ||
-                                ACTIVITI_EXTENSIONS_NAMESPACE.equals(attribute.getNamespace()))) {
+                                ACTIVITI_EXTENSIONS_NAMESPACE.equals(attribute.getNamespace()) ||
+                                CAMUNDA_EXTENSIONS_NAMESPACE.equals(attribute.getNamespace()))) {
 
                             return true;
                         }
@@ -577,5 +607,34 @@ public class BpmnXMLUtil implements BpmnXMLConstants {
             }
         }
         return false;
+    }
+
+    public static void parseLabelElement(XMLStreamReader xtr, BpmnModel model, String BpmnElementId) throws Exception {
+        GraphicInfo labelGraphicInfo = new GraphicInfo();
+        BpmnXMLUtil.addXMLLocation(labelGraphicInfo, xtr);
+
+        if (xtr.getAttributeValue(null, ATTRIBUTE_DI_ROTATION) != null
+                && !xtr.getAttributeValue(null, ATTRIBUTE_DI_ROTATION).isEmpty()) {
+            labelGraphicInfo.setRotation(Double.valueOf(xtr.getAttributeValue(null, ATTRIBUTE_DI_ROTATION)).intValue());
+        }
+
+        while (xtr.hasNext()) {
+            xtr.next();
+            if (xtr.isStartElement() && ELEMENT_DI_BOUNDS.equalsIgnoreCase(xtr.getLocalName())) {
+
+                labelGraphicInfo.setX(Double.valueOf(xtr.getAttributeValue(null, ATTRIBUTE_DI_X)).intValue());
+                labelGraphicInfo.setY(Double.valueOf(xtr.getAttributeValue(null, ATTRIBUTE_DI_Y)).intValue());
+                labelGraphicInfo.setWidth(Double.valueOf(xtr.getAttributeValue(null, ATTRIBUTE_DI_WIDTH)).intValue());
+                labelGraphicInfo.setHeight(Double.valueOf(xtr.getAttributeValue(null, ATTRIBUTE_DI_HEIGHT)).intValue());
+                model.addLabelGraphicInfo(BpmnElementId, labelGraphicInfo);
+                break;
+            } else if (xtr.isEndElement() && ELEMENT_DI_LABEL.equalsIgnoreCase(xtr.getLocalName())) {
+                break;
+            }
+        }
+    }
+
+    public static boolean containsNewLine(String str) {
+        return str != null && str.contains("\n");
     }
 }

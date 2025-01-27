@@ -17,8 +17,6 @@ import static org.flowable.common.rest.api.PaginateListUtil.paginateList;
 
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.flowable.cmmn.api.CmmnManagementService;
 import org.flowable.cmmn.rest.service.api.CmmnRestApiInterceptor;
 import org.flowable.cmmn.rest.service.api.CmmnRestResponseFactory;
@@ -73,7 +71,7 @@ public class HistoryJobCollectionResource {
             @ApiResponse(code = 400, message = "Indicates an illegal value has been used in a url query parameter. Status description contains additional details about the error.")
     })
     @GetMapping(value = "/cmmn-management/history-jobs", produces = "application/json")
-    public DataResponse<HistoryJobResponse> getHistoryJobs(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<HistoryJobResponse> getHistoryJobs(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         HistoryJobQuery query = managementService.createHistoryJobQuery();
 
         if (allRequestParams.containsKey("id")) {
@@ -83,7 +81,7 @@ public class HistoryJobCollectionResource {
             query.jobId(allRequestParams.get("scopeType"));
         }
         if (allRequestParams.containsKey("withException")) {
-            if (Boolean.valueOf(allRequestParams.get("withException"))) {
+            if (Boolean.parseBoolean(allRequestParams.get("withException"))) {
                 query.withException();
             }
         }
@@ -94,12 +92,12 @@ public class HistoryJobCollectionResource {
             query.lockOwner(allRequestParams.get("lockOwner"));
         }
         if (allRequestParams.containsKey("locked")) {
-            if (Boolean.valueOf(allRequestParams.get("locked"))) {
+            if (Boolean.parseBoolean(allRequestParams.get("locked"))) {
                 query.locked();
             }
         }
         if (allRequestParams.containsKey("unlocked")) {
-            if (Boolean.valueOf(allRequestParams.get("unlocked"))) {
+            if (Boolean.parseBoolean(allRequestParams.get("unlocked"))) {
                 query.unlocked();
             }
         }
@@ -110,7 +108,7 @@ public class HistoryJobCollectionResource {
             query.jobTenantIdLike(allRequestParams.get("tenantIdLike"));
         }
         if (allRequestParams.containsKey("withoutTenantId")) {
-            if (Boolean.valueOf(allRequestParams.get("withoutTenantId"))) {
+            if (Boolean.parseBoolean(allRequestParams.get("withoutTenantId"))) {
                 query.jobWithoutTenantId();
             }
         }

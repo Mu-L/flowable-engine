@@ -168,6 +168,15 @@ public abstract class MultiInstanceActivityBehavior extends FlowNodeActivityBeha
     
     @Override
     public void leave(DelegateExecution execution) {
+        DelegateExecution rootExecution = null;
+        try {
+            rootExecution = getMultiInstanceRootExecution(execution);
+            CommandContextUtil.getProcessEngineConfiguration().getListenerNotificationHelper()
+                    .executeExecutionListeners(activity, rootExecution, ExecutionListener.EVENTNAME_END);
+        } catch (BpmnError error) {
+            ErrorPropagation.propagateError(error, rootExecution);
+            return;
+        }
         cleanupMiRoot(execution);
     }
 
@@ -197,8 +206,9 @@ public abstract class MultiInstanceActivityBehavior extends FlowNodeActivityBeha
 
                     Integer elementIndexValue = getLoopVariable(childExecution, getCollectionElementIndexVariable());
                     String counterValue = aggregatedVarInstance.getId() + COUNTER_VAR_VALUE_SEPARATOR + elementIndexValue;
-                    VariableInstanceEntity counterVarInstance = createScopedVariableAggregationVariableInstance(COUNTER_VAR_PREFIX + targetVarName,
-                            aggregatedVarInstance.getScopeId(), aggregatedVarInstance.getSubScopeId(), counterValue, variableServiceConfiguration);
+                    VariableInstanceEntity counterVarInstance = createScopedVariableAggregationVariableInstance(childExecution.getTenantId(),
+                            COUNTER_VAR_PREFIX + targetVarName, aggregatedVarInstance.getScopeId(), aggregatedVarInstance.getSubScopeId(), counterValue,
+                            variableServiceConfiguration);
                     variableService.insertVariableInstance(counterVarInstance);
                 }
             }
@@ -337,6 +347,13 @@ public abstract class MultiInstanceActivityBehavior extends FlowNodeActivityBeha
     
     @Override
     public void interrupted(DelegateExecution execution) {
+        if (execution.isMultiInstanceRoot()) {
+            // We are only performing the interrupt logic for multi instance root executions
+            internalInterrupted(execution);
+        }
+    }
+
+    protected void internalInterrupted(DelegateExecution execution) {
         if (hasVariableAggregationDefinitions(execution)) {
             Map<String, VariableAggregationDefinition> aggregationsByTarget = groupAggregationsByTarget(execution, aggregations.getOverviewAggregations(),
                     CommandContextUtil.getProcessEngineConfiguration());
@@ -488,12 +505,33 @@ public abstract class MultiInstanceActivityBehavior extends FlowNodeActivityBeha
                 }
                 
             } else {
-                throw new FlowableIllegalArgumentException("Couldn't resolve collection expression, variable reference or string");
-                
+                throw new FlowableIllegalArgumentException(buildUnresolvedCollectionExceptionMessage());
             }
         }
     }
-    
+
+    protected String buildUnresolvedCollectionExceptionMessage() {
+        StringBuilder exceptionStringBuilder = new StringBuilder("Couldn't resolve collection expression");
+        if (collectionExpression != null) {
+            exceptionStringBuilder.append(" (");
+            exceptionStringBuilder.append(collectionExpression.getExpressionText());
+            exceptionStringBuilder.append(")");
+        }
+        exceptionStringBuilder.append(", variable reference");
+        if (collectionVariable != null) {
+            exceptionStringBuilder.append(" (");
+            exceptionStringBuilder.append(collectionVariable);
+            exceptionStringBuilder.append(")");
+        }
+        exceptionStringBuilder.append(" or string");
+        if (collectionString != null) {
+            exceptionStringBuilder.append(" (");
+            exceptionStringBuilder.append(collectionString);
+            exceptionStringBuilder.append(")");
+        }
+        return exceptionStringBuilder.toString();
+    }
+
     @SuppressWarnings({ "unchecked", "rawtypes" })
     protected Collection iterableToCollection(Iterable iterable) {
         List result = new ArrayList();

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.flowable.cmmn.api.StageResponse;
+import org.flowable.cmmn.api.history.HistoricCaseInstance;
 import org.flowable.cmmn.api.history.HistoricPlanItemInstance;
 import org.flowable.cmmn.api.runtime.CaseInstance;
 import org.flowable.cmmn.api.runtime.PlanItemInstance;
@@ -783,6 +784,88 @@ public class StageTest extends FlowableCmmnTestCase {
             assertThat(stageMap.get("Stage 2").getEndTime()).isNotNull();
         }
     }
+    
+    @Test
+    @CmmnDeployment
+    public void testGetStageAndMilestoneOverviewExpression() {
+        Date now = new Date();
+        setClockTo(now);
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder()
+                .caseDefinitionKey("testCase")
+                .variable("showInStage", true)
+                .variable("showMilestoneInOverview", true)
+                .variable("milestoneName", "This is a milestone name")
+                .variable("stageName", "This is a stage name")
+                .start();
+
+        List<StageResponse> stages = cmmnRuntimeService.getStageOverview(caseInstance.getId());
+        assertThat(stages).hasSize(5);
+
+        Map<String, StageResponse> stageMap = new HashMap<>();
+        for (StageResponse stageResponse : stages) {
+            stageMap.put(stageResponse.getName(), stageResponse);
+        }
+
+        assertThat(stageMap.get("This is a milestone name").getName()).isEqualTo("This is a milestone name");
+        assertThat(stageMap.get("This is a milestone name").isCurrent()).isFalse();
+        assertThat(stageMap.get("This is a milestone name").isEnded()).isTrue();
+        assertThat(stageMap.get("This is a milestone name").getEndTime()).isNotNull();
+
+        assertThat(stageMap.get("This is a stage name").getName()).isEqualTo("This is a stage name");
+        assertThat(stageMap.get("This is a stage name").isCurrent()).isTrue();
+        assertThat(stageMap.get("This is a stage name").isEnded()).isFalse();
+        assertThat(stageMap.get("This is a stage name").getEndTime()).isNull();
+
+        assertThat(stageMap.get("Stage 2").getName()).isEqualTo("Stage 2");
+        assertThat(stageMap.get("Stage 2").isCurrent()).isFalse();
+        assertThat(stageMap.get("Stage 2").isEnded()).isFalse();
+        assertThat(stageMap.get("Stage 2").getEndTime()).isNull();
+
+        assertThat(stageMap.get("Milestone 2.1").getName()).isEqualTo("Milestone 2.1");
+        assertThat(stageMap.get("Milestone 2.1").isCurrent()).isFalse();
+        assertThat(stageMap.get("Milestone 2.1").isEnded()).isFalse();
+        assertThat(stageMap.get("Milestone 2.1").getEndTime()).isNull();
+
+        assertThat(stageMap.get("Stage 2.1").getName()).isEqualTo("Stage 2.1");
+        assertThat(stageMap.get("Stage 2.1").isCurrent()).isFalse();
+        assertThat(stageMap.get("Stage 2.1").isEnded()).isFalse();
+        assertThat(stageMap.get("Stage 2.1").getEndTime()).isNull();
+
+        if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, cmmnEngineConfiguration)) {
+            stages = cmmnHistoryService.getStageOverview(caseInstance.getId());
+            assertThat(stages).hasSize(5);
+
+            stageMap = new HashMap<>();
+            for (StageResponse stageResponse : stages) {
+                stageMap.put(stageResponse.getName(), stageResponse);
+            }
+
+            assertThat(stageMap.get("This is a milestone name").getName()).isEqualTo("This is a milestone name");
+            assertThat(stageMap.get("This is a milestone name").isCurrent()).isFalse();
+            assertThat(stageMap.get("This is a milestone name").isEnded()).isTrue();
+            assertThat(stageMap.get("This is a milestone name").getEndTime()).isNotNull();
+
+            assertThat(stageMap.get("This is a stage name").getName()).isEqualTo("This is a stage name");
+            assertThat(stageMap.get("This is a stage name").isCurrent()).isTrue();
+            assertThat(stageMap.get("This is a stage name").isEnded()).isFalse();
+            assertThat(stageMap.get("This is a stage name").getEndTime()).isNull();
+
+            assertThat(stageMap.get("Stage 2").getName()).isEqualTo("Stage 2");
+            assertThat(stageMap.get("Stage 2").isCurrent()).isFalse();
+            assertThat(stageMap.get("Stage 2").isEnded()).isFalse();
+            assertThat(stageMap.get("Stage 2").getEndTime()).isNull();
+
+            assertThat(stageMap.get("Milestone 2.1").getName()).isEqualTo("Milestone 2.1");
+            assertThat(stageMap.get("Milestone 2.1").isCurrent()).isFalse();
+            assertThat(stageMap.get("Milestone 2.1").isEnded()).isFalse();
+            assertThat(stageMap.get("Milestone 2.1").getEndTime()).isNull();
+
+            assertThat(stageMap.get("Stage 2.1").getName()).isEqualTo("Stage 2.1");
+            assertThat(stageMap.get("Stage 2.1").isCurrent()).isFalse();
+            assertThat(stageMap.get("Stage 2.1").isEnded()).isFalse();
+            assertThat(stageMap.get("Stage 2.1").getEndTime()).isNull();
+        }
+    }
 
     @Test
     @CmmnDeployment
@@ -941,5 +1024,29 @@ public class StageTest extends FlowableCmmnTestCase {
 
         cmmnRuntimeService.completeStagePlanItemInstance(stagePlanItemInstance.getId(), true);
         assertCaseInstanceEnded(caseInstance);
+    }
+
+    @Test
+    @CmmnDeployment
+    public void testStageBusinessStatus() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder().caseDefinitionKey("testStageBusinessStatus")
+                .businessStatus("beforeStage").variable("secondStageVar", "secondStage").start();
+
+        caseInstance = cmmnRuntimeService.createCaseInstanceQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(caseInstance.getBusinessStatus()).isEqualTo("beforeStage");
+
+        Task beforeStageTask = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).taskDefinitionKey("beforeStage").singleResult();
+        cmmnTaskService.complete(beforeStageTask.getId());
+
+        caseInstance = cmmnRuntimeService.createCaseInstanceQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(caseInstance.getBusinessStatus()).isEqualTo("firstStage");
+
+        Task insideStageTask = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).taskDefinitionKey("insideStage").singleResult();
+        cmmnTaskService.complete(insideStageTask.getId());
+
+        assertCaseInstanceEnded(caseInstance);
+
+        HistoricCaseInstance historicCaseInstance = cmmnHistoryService.createHistoricCaseInstanceQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(historicCaseInstance.getBusinessStatus()).isEqualTo("secondStage");
     }
 }

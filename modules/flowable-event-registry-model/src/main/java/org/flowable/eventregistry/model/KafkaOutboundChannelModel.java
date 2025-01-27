@@ -12,6 +12,7 @@
  */
 package org.flowable.eventregistry.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 
@@ -22,8 +23,10 @@ import com.fasterxml.jackson.annotation.JsonInclude.Include;
 public class KafkaOutboundChannelModel extends OutboundChannelModel {
 
     protected String topic;
-    protected String recordKey;
-    
+    protected RecordKey recordKey;
+
+    protected KafkaPartition partition;
+
     public KafkaOutboundChannelModel() {
         super();
         setType("kafka");
@@ -37,11 +40,93 @@ public class KafkaOutboundChannelModel extends OutboundChannelModel {
         this.topic = topic;
     }
 
-    public String getRecordKey() {
+    public RecordKey getRecordKey() {
         return recordKey;
     }
 
-    public void setRecordKey(String recordKey) {
+    public void setRecordKey(RecordKey recordKey) {
         this.recordKey = recordKey;
+    }
+
+    public KafkaPartition getPartition() {
+        return partition;
+    }
+
+    public void setPartition(KafkaPartition partition) {
+        this.partition = partition;
+    }
+
+    @JsonInclude(Include.NON_NULL)
+    public static class KafkaPartition {
+
+        protected String eventField;
+        protected String roundRobin;
+        protected String delegateExpression;
+
+        public String getEventField() {
+            return eventField;
+        }
+
+        public void setEventField(String eventField) {
+            this.eventField = eventField;
+        }
+
+        public String getRoundRobin() {
+            return roundRobin;
+        }
+
+        public void setRoundRobin(String roundRobin) {
+            this.roundRobin = roundRobin;
+        }
+
+        public String getDelegateExpression() {
+            return delegateExpression;
+        }
+
+        public void setDelegateExpression(String delegateExpression) {
+            this.delegateExpression = delegateExpression;
+        }
+    }
+
+    @JsonInclude(Include.NON_NULL)
+    public static class RecordKey {
+
+        protected String fixedValue;
+
+        protected String eventField;
+
+        protected String delegateExpression;
+
+        public String getFixedValue() {
+            return fixedValue;
+        }
+
+        public void setFixedValue(String fixedValue) {
+            this.fixedValue = fixedValue;
+        }
+
+        public String getEventField() {
+            return eventField;
+        }
+
+        public void setEventField(String eventField) {
+            this.eventField = eventField;
+        }
+
+        public String getDelegateExpression() {
+            return delegateExpression;
+        }
+
+        public void setDelegateExpression(String delegateExpression) {
+            this.delegateExpression = delegateExpression;
+        }
+
+        // backward compatibility
+        @JsonCreator
+        public static RecordKey fromFixedValue(String fixedValue) {
+            RecordKey recordKey = new RecordKey();
+            recordKey.setFixedValue(fixedValue);
+            return recordKey;
+        }
     }
 }

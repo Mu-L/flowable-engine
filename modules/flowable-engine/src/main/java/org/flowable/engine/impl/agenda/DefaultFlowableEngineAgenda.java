@@ -15,6 +15,7 @@ package org.flowable.engine.impl.agenda;
 import java.util.Collection;
 
 import org.flowable.common.engine.impl.agenda.AbstractAgenda;
+import org.flowable.common.engine.impl.agenda.AgendaFutureMaxWaitTimeoutProvider;
 import org.flowable.common.engine.impl.interceptor.Command;
 import org.flowable.common.engine.impl.interceptor.CommandContext;
 import org.flowable.common.engine.impl.interceptor.CommandExecutor;
@@ -57,6 +58,11 @@ public class DefaultFlowableEngineAgenda extends AbstractAgenda implements Flowa
         }
     }
 
+    @Override
+    protected AgendaFutureMaxWaitTimeoutProvider getAgendaFutureMaxWaitTimeoutProvider() {
+        return CommandContextUtil.getProcessEngineConfiguration(commandContext).getAgendaFutureMaxWaitTimeoutProvider();
+    }
+
     /* SPECIFIC operations */
 
     @Override
@@ -86,7 +92,12 @@ public class DefaultFlowableEngineAgenda extends AbstractAgenda implements Flowa
 
     @Override
     public void planTakeOutgoingSequenceFlowsOperation(ExecutionEntity execution, boolean evaluateConditions) {
-        planOperation(new TakeOutgoingSequenceFlowsOperation(commandContext, execution, evaluateConditions), execution);
+        planOperation(new TakeOutgoingSequenceFlowsOperation(commandContext, execution, evaluateConditions, false), execution);
+    }
+
+    @Override
+    public void planTakeOutgoingSequenceFlowsSynchronousOperation(ExecutionEntity execution, boolean evaluateConditions) {
+        planOperation(new TakeOutgoingSequenceFlowsOperation(commandContext, execution, evaluateConditions, true), execution);
     }
 
     @Override

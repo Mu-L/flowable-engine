@@ -13,12 +13,11 @@
 package org.flowable.dmn.test.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.flowable.cmmn.api.CmmnRuntimeService;
 import org.flowable.cmmn.api.DecisionTableVariableManager;
 import org.flowable.cmmn.api.runtime.CaseInstance;
@@ -37,8 +36,9 @@ import org.flowable.task.api.Task;
 import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.DoubleNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -53,9 +53,6 @@ public class DecisionTaskTest {
     @Rule
     public FlowableCmmnRule cmmnRule = new FlowableCmmnRule("org/flowable/cmmn/test/runtime/DecisionTaskTest.cfg.xml");
     
-    @Rule
-    public ExpectedException expectedException = ExpectedException.none();
-
     @After
     public void tearDown() {
         deleteAllDmnDeployments();
@@ -83,14 +80,11 @@ public class DecisionTaskTest {
             }
     )
     public void testUnknowPropertyUsedInDmn() {
-        this.expectedException.expect(FlowableException.class);
-        this.expectedException.expectMessage("DMN decision with key decisionTable execution failed. Cause: Unknown property used in expression: #{testVar == \"test2\"}");
-        
-        CaseInstance caseInstance = cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
+        assertThatThrownBy(() -> cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
                 .caseDefinitionKey("myCase")
-                .start();
-
-        assertResultVariable(caseInstance);
+                .start())
+                .isInstanceOf(FlowableException.class)
+                .hasMessageContaining("DMN decision with key decisionTable execution failed. Cause: Unknown property used in expression: #{testVar == \"test2\"}");
     }
 
     @Test
@@ -163,14 +157,13 @@ public class DecisionTaskTest {
             }
     )
     public void testThrowErrorOnNoHit() {
-        this.expectedException.expect(FlowableException.class);
-        this.expectedException.expectMessage("DMN decision with key decisionTable did not hit any rules for the provided input.");
-
-        cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
+        assertThatThrownBy(() -> cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
                 .variable("throwErrorOnNoHits", true)
                 .variable("testVar", "noHit")
                 .caseDefinitionKey("myCase")
-                .start();
+                .start())
+                .isInstanceOf(FlowableException.class)
+                .hasMessageContaining("DMN decision with key decisionTable did not hit any rules for the provided input.");
     }
 
     @Test
@@ -210,14 +203,13 @@ public class DecisionTaskTest {
             resources = {"org/flowable/cmmn/test/runtime/DecisionTaskTest.testExpressionReferenceKey.cmmn"}
     )
     public void testNullReferenceKey() {
-        this.expectedException.expect(FlowableException.class);
-        this.expectedException.expectMessage("Could not execute decision: no externalRef defined");
-
-        cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
+        assertThatThrownBy(() -> cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
                 .caseDefinitionKey("myCase")
                 .variable("testVar", "test2")
                 .variable("referenceKey", null)
-                .start();
+                .start())
+                .isInstanceOf(FlowableException.class)
+                .hasMessageContaining("Could not execute decision: no externalRef defined");
     }
 
     @Test
@@ -225,14 +217,13 @@ public class DecisionTaskTest {
             resources = {"org/flowable/cmmn/test/runtime/DecisionTaskTest.testExpressionReferenceKey.cmmn"}
     )
     public void testNonStringReferenceKey() {
-        this.expectedException.expect(FlowableException.class);
-        this.expectedException.expectMessage("No decision found for key: 1 and parent deployment id");
-
-        cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
+        assertThatThrownBy(() -> cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
                 .caseDefinitionKey("myCase")
                 .variable("testVar", "test2")
                 .variable("referenceKey", 1)
-                .start();
+                .start())
+                .isInstanceOf(FlowableException.class)
+                .hasMessageContaining("No decision found for key: 1 and parent deployment id");
     }
 
     @Test
@@ -240,14 +231,13 @@ public class DecisionTaskTest {
             resources = {"org/flowable/cmmn/test/runtime/DecisionTaskTest.testExpressionReferenceKey.cmmn"}
     )
     public void testNonExistingReferenceKey() {
-        this.expectedException.expect(FlowableException.class);
-        this.expectedException.expectMessage("No decision found for key: NonExistingReferenceKey and parent deployment id");
-
-        cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
+        assertThatThrownBy(() -> cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
                 .caseDefinitionKey("myCase")
                 .variable("testVar", "test2")
                 .variable("referenceKey", "NonExistingReferenceKey")
-                .start();
+                .start())
+                .isInstanceOf(FlowableException.class)
+                .hasMessageContaining("No decision found for key: NonExistingReferenceKey and parent deployment id");
     }
 
     @Test
@@ -303,10 +293,9 @@ public class DecisionTaskTest {
         tenantId = "flowable"
     )
     public void testDecisionServiceTaskWithFallbackFalse() {
-        this.expectedException.expect(FlowableException.class);
-        this.expectedException.expectMessage("and tenant id: flowable. There was also no fall back decision found without parent deployment id.");
-
-        deployDmnTableAssertCaseStarted();
+        assertThatThrownBy(this::deployDmnTableAssertCaseStarted)
+                .isInstanceOf(FlowableException.class)
+                .hasMessageContaining("and tenant id: flowable. There was also no fall back decision found without parent deployment id.");
     }
     
     @Test
@@ -324,10 +313,9 @@ public class DecisionTaskTest {
         tenantId = "flowable"
     )
     public void testDecisionServiceTaskWithGlobalTenantFallbackNoDefinition() {
-        this.expectedException.expect(FlowableException.class);
-        this.expectedException.expectMessage("There was also no fall back decision found for default tenant defaultFlowable");
-
-        deployDmnTableWithGlobalTenantFallback("otherTenant");
+        assertThatThrownBy(() -> deployDmnTableWithGlobalTenantFallback("otherTenant"))
+                .isInstanceOf(FlowableException.class)
+                .hasMessageContaining("There was also no fall back decision found for default tenant defaultFlowable");
     }
 
     @Test
@@ -603,11 +591,9 @@ public class DecisionTaskTest {
             }
 
             @Override
-            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
-            }
+            public void setDecisionServiceVariablesOnPlanItemInstance(Map<String, List<Map<String, Object>>> executionResult, String decisionKey,
+                    PlanItemInstance planItemInstance, ObjectMapper objectMapper, boolean multipleResults) {
 
-            @Override
-            public void setDecisionServiceVariablesOnExecution(Map<String, List<Map<String, Object>>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
             }
         });
         this.cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
@@ -627,13 +613,17 @@ public class DecisionTaskTest {
         DecisionTableVariableManager originalDecisionTableVariableManager = cmmnEngineConfiguration.getDecisionTableVariableManager();
         final boolean[] setVariableOnPlanItemCalled = {false};
         cmmnEngineConfiguration.setDecisionTableVariableManager(new DecisionTableVariableManager() {
+
             @Override
-            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> decisionResult, String externalRef, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
+            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> decisionResult, String externalRef, PlanItemInstance planItemInstance,
+                    ObjectMapper objectMapper, boolean multipleResults) {
                 setVariableOnPlanItemCalled[0] = true;
             }
 
             @Override
-            public void setDecisionServiceVariablesOnExecution(Map<String, List<Map<String, Object>>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
+            public void setDecisionServiceVariablesOnPlanItemInstance(Map<String, List<Map<String, Object>>> executionResult, String decisionKey,
+                    PlanItemInstance planItemInstance, ObjectMapper objectMapper, boolean multipleResults) {
+
             }
         });
         this.cmmnRule.getCmmnRuntimeService().createCaseInstanceBuilder()
@@ -653,12 +643,16 @@ public class DecisionTaskTest {
         DecisionTableVariableManager originalDecisionTableVariableManager = cmmnRule.getCmmnEngineConfiguration().getDecisionTableVariableManager();
         final boolean[] setCalled = {false};
         cmmnRule.getCmmnEngineConfiguration().setDecisionTableVariableManager(new DecisionTableVariableManager() {
+
             @Override
-            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
+            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> decisionResult, String externalRef, PlanItemInstance planItemInstance,
+                    ObjectMapper objectMapper, boolean multipleResults) {
+
             }
 
             @Override
-            public void setDecisionServiceVariablesOnExecution(Map<String, List<Map<String, Object>>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
+            public void setDecisionServiceVariablesOnPlanItemInstance(Map<String, List<Map<String, Object>>> executionResult, String decisionKey,
+                    PlanItemInstance planItemInstance, ObjectMapper objectMapper, boolean multipleResults) {
                 setCalled[0] = true;
             }
         });
@@ -681,12 +675,11 @@ public class DecisionTaskTest {
         DecisionTableVariableManager originalDecisionTableVariableManager = cmmnRule.getCmmnEngineConfiguration().getDecisionTableVariableManager();
         final boolean[] setCalled = {false};
         cmmnRule.getCmmnEngineConfiguration().setDecisionTableVariableManager(new DecisionTableVariableManager() {
-            @Override
-            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
-            }
 
             @Override
-            public void setDecisionServiceVariablesOnExecution(Map<String, List<Map<String, Object>>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
+            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> decisionResult, String externalRef, PlanItemInstance planItemInstance,
+                    ObjectMapper objectMapper, boolean multipleResults) {
+
             }
 
             @Override
@@ -715,12 +708,10 @@ public class DecisionTaskTest {
         DecisionTableVariableManager originalDecisionTableVariableManager = cmmnRule.getCmmnEngineConfiguration().getDecisionTableVariableManager();
         final boolean[] setCalled = {false};
         cmmnRule.getCmmnEngineConfiguration().setDecisionTableVariableManager(new DecisionTableVariableManager() {
-            @Override
-            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
-            }
 
             @Override
-            public void setDecisionServiceVariablesOnExecution(Map<String, List<Map<String, Object>>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
+            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> decisionResult, String externalRef, PlanItemInstance planItemInstance,
+                    ObjectMapper objectMapper, boolean multipleResults) {
             }
 
             @Override
@@ -749,12 +740,10 @@ public class DecisionTaskTest {
         DecisionTableVariableManager originalDecisionTableVariableManager = cmmnRule.getCmmnEngineConfiguration().getDecisionTableVariableManager();
         final boolean[] setCalled = {false};
         cmmnRule.getCmmnEngineConfiguration().setDecisionTableVariableManager(new DecisionTableVariableManager() {
-            @Override
-            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
-            }
 
             @Override
-            public void setDecisionServiceVariablesOnExecution(Map<String, List<Map<String, Object>>> executionResult, String decisionKey, PlanItemInstance planItemInstance, ObjectMapper objectMapper) {
+            public void setVariablesOnPlanItemInstance(List<Map<String, Object>> decisionResult, String externalRef, PlanItemInstance planItemInstance,
+                    ObjectMapper objectMapper, boolean multipleResults) {
             }
 
             @Override

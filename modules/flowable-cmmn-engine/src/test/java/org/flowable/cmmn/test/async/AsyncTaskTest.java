@@ -24,9 +24,13 @@ import org.flowable.cmmn.api.runtime.PlanItemInstanceState;
 import org.flowable.cmmn.engine.test.CmmnDeployment;
 import org.flowable.cmmn.engine.test.FlowableCmmnTestCase;
 import org.flowable.cmmn.engine.test.impl.CmmnJobTestHelper;
+import org.flowable.cmmn.test.delegate.TestJavaDelegateThrowsException;
+import org.flowable.common.engine.api.FlowableException;
 import org.flowable.common.engine.api.scope.ScopeTypes;
+import org.flowable.job.api.FlowableUnrecoverableJobException;
 import org.flowable.job.api.Job;
 import org.flowable.task.api.Task;
+import org.flowable.variable.api.persistence.entity.VariableInstance;
 import org.junit.Test;
 
 /**
@@ -52,6 +56,33 @@ public class AsyncTaskTest extends FlowableCmmnTestCase {
         task = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).singleResult();
         assertThat(task.getName()).isEqualTo("Task after service task");
         assertThat(cmmnRuntimeService.getVariable(caseInstance.getId(), "javaDelegate")).isEqualTo("executed");
+    }
+
+    @Test
+    @CmmnDeployment
+    public void testAsyncServiceTaskCurrentTenant() {
+        CaseInstance noTenantCase = cmmnRuntimeService.createCaseInstanceBuilder()
+                .caseDefinitionKey("testAsyncServiceTask")
+                .start();
+        CaseInstance flowableCase = cmmnRuntimeService.createCaseInstanceBuilder()
+                .caseDefinitionKey("testAsyncServiceTask")
+                .overrideCaseDefinitionTenantId("flowable")
+                .start();
+        CaseInstance muppetsCase = cmmnRuntimeService.createCaseInstanceBuilder()
+                .caseDefinitionKey("testAsyncServiceTask")
+                .overrideCaseDefinitionTenantId("muppets")
+                .start();
+        assertThat(cmmnRuntimeService.hasVariable(noTenantCase.getId(), "currentTenantVar")).isFalse();
+        assertThat(cmmnRuntimeService.hasVariable(flowableCase.getId(), "currentTenantVar")).isFalse();
+        assertThat(cmmnRuntimeService.hasVariable(muppetsCase.getId(), "currentTenantVar")).isFalse();
+
+        waitForJobExecutorToProcessAllJobs();
+
+        VariableInstance variableInstance = cmmnRuntimeService.getVariableInstance(noTenantCase.getId(), "currentTenantVar");
+        assertThat(variableInstance).isNotNull();
+        assertThat((String) variableInstance.getValue()).isNullOrEmpty();
+        assertThat(cmmnRuntimeService.getVariable(flowableCase.getId(), "currentTenantVar")).isEqualTo("flowable");
+        assertThat(cmmnRuntimeService.getVariable(muppetsCase.getId(), "currentTenantVar")).isEqualTo("muppets");
     }
     
     @Test
@@ -139,6 +170,96 @@ public class AsyncTaskTest extends FlowableCmmnTestCase {
         task = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).singleResult();
         assertThat(task.getName()).isEqualTo("Task after service task");
         assertThat(cmmnRuntimeService.getVariable(caseInstance.getId(), "javaDelegate")).isEqualTo("executed");
+    }
+
+    @Test
+    @CmmnDeployment
+    public void testAsyncServiceTaskWithFailure() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder().caseDefinitionKey("testAsyncServiceTask").start();
+        Task task = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(task.getName()).isEqualTo("Task before service task");
+        cmmnTaskService.complete(task.getId());
+
+        Job job = cmmnManagementService.createJobQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(job).isNotNull();
+        assertThat(job.getElementId()).isEqualTo("asyncServiceTask");
+        assertThat(job.getElementName()).isEqualTo("Async service task");
+        assertThat(job.getRetries()).isEqualTo(3);
+        String correlationId = job.getCorrelationId();
+
+        assertThatThrownBy(() -> cmmnManagementService.executeJob(job.getId()));
+
+        Job timerJob = cmmnManagementService.createTimerJobQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(timerJob).isNotNull();
+        assertThat(timerJob.getCorrelationId()).isEqualTo(correlationId);
+        assertThat(timerJob.getRetries()).isEqualTo(2);
+        assertThat(cmmnManagementService.createJobQuery().count()).isZero();
+        assertThat(cmmnManagementService.createDeadLetterJobQuery().count()).isZero();
+    }
+
+    @Test
+    @CmmnDeployment(resources = "org/flowable/cmmn/test/async/AsyncTaskTest.testAsyncServiceTaskWithFailure.cmmn")
+    public void testAsyncServiceTaskWithUnrecoverableFailure() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder().caseDefinitionKey("testAsyncServiceTask").start();
+        Task task = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(task.getName()).isEqualTo("Task before service task");
+        cmmnTaskService.complete(task.getId());
+
+        Job job = cmmnManagementService.createJobQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(job).isNotNull();
+        assertThat(job.getElementId()).isEqualTo("asyncServiceTask");
+        assertThat(job.getElementName()).isEqualTo("Async service task");
+        assertThat(job.getRetries()).isEqualTo(3);
+        String correlationId = job.getCorrelationId();
+
+        try {
+            TestJavaDelegateThrowsException.setExceptionSupplier(() -> new FlowableUnrecoverableJobException("Test exception"));
+            assertThatThrownBy(() -> cmmnManagementService.executeJob(job.getId()));
+        } finally {
+            TestJavaDelegateThrowsException.resetExceptionSupplier();
+        }
+
+        Job deadLetterJob = cmmnManagementService.createDeadLetterJobQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(deadLetterJob).isNotNull();
+        assertThat(deadLetterJob.getCorrelationId()).isEqualTo(correlationId);
+        assertThat(deadLetterJob.getRetries()).isZero();
+        assertThat(cmmnManagementService.createJobQuery().count()).isZero();
+        assertThat(cmmnManagementService.createTimerJobQuery().count()).isZero();
+    }
+
+    @Test
+    @CmmnDeployment(resources = "org/flowable/cmmn/test/async/AsyncTaskTest.testAsyncServiceTaskWithFailure.cmmn")
+    public void testAsyncServiceTaskWithUnrecoverableFailureAsCause() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder().caseDefinitionKey("testAsyncServiceTask").start();
+        Task task = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(task.getName()).isEqualTo("Task before service task");
+        cmmnTaskService.complete(task.getId());
+
+        Job job = cmmnManagementService.createJobQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(job).isNotNull();
+        assertThat(job.getElementId()).isEqualTo("asyncServiceTask");
+        assertThat(job.getElementName()).isEqualTo("Async service task");
+        assertThat(job.getRetries()).isEqualTo(3);
+        String correlationId = job.getCorrelationId();
+
+        try {
+            TestJavaDelegateThrowsException.setExceptionSupplier(() -> new FlowableException("Test", new FlowableUnrecoverableJobException("Test exception")));
+            assertThatThrownBy(() -> cmmnManagementService.executeJob(job.getId()))
+                    .isExactlyInstanceOf(FlowableException.class)
+                    .hasMessage("Test")
+                    .cause()
+                    .isInstanceOf(FlowableUnrecoverableJobException.class)
+                    .hasMessage("Test exception");
+        } finally {
+            TestJavaDelegateThrowsException.resetExceptionSupplier();
+        }
+
+        Job deadLetterJob = cmmnManagementService.createDeadLetterJobQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(deadLetterJob).isNotNull();
+        assertThat(deadLetterJob.getCorrelationId()).isEqualTo(correlationId);
+        assertThat(deadLetterJob.getRetries()).isZero();
+        assertThat(cmmnManagementService.createJobQuery().count()).isZero();
+        assertThat(cmmnManagementService.createTimerJobQuery().count()).isZero();
     }
 
     @Test
@@ -277,5 +398,6 @@ public class AsyncTaskTest extends FlowableCmmnTestCase {
         assertThat(cmmnRuntimeService.getVariable(caseInstance.getId(), "serviceTaskVar1")).isEqualTo("firstST");
         assertThat(cmmnRuntimeService.getVariable(caseInstance.getId(), "serviceTaskVar2")).isEqualTo("secondST");
     }
+
 
 }

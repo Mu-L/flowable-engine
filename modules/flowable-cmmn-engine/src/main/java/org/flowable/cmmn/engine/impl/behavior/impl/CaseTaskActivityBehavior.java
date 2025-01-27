@@ -80,7 +80,7 @@ public class CaseTaskActivityBehavior extends ChildTaskActivityBehavior implemen
 
         }
         if (StringUtils.isEmpty(caseDefinitionKey)) {
-            throw new FlowableException("Could not start case instance: no case reference defined");
+            throw new FlowableException("Could not start case instance: no case reference defined in " + planItemInstanceEntity);
         }
 
         CaseInstanceBuilder caseInstanceBuilder = new CaseInstanceBuilderImpl().caseDefinitionKey(caseDefinitionKey);
@@ -109,8 +109,9 @@ public class CaseTaskActivityBehavior extends ChildTaskActivityBehavior implemen
                     throw new FlowableIllegalStateException("Form engine is not initialized");
                 }
 
-                variablesFromFormSubmission = formService
-                        .getVariablesFromFormSubmission(variableInfo.formInfo, variableInfo.formVariables, variableInfo.formOutcome);
+                variablesFromFormSubmission = formService.getVariablesFromFormSubmission(planItemInstanceEntity.getPlanItemDefinitionId(), "caseTask", 
+                        planItemInstanceEntity.getCaseInstanceId(), planItemInstanceEntity.getCaseDefinitionId(), ScopeTypes.CMMN, 
+                        variableInfo.formInfo, variableInfo.formVariables, variableInfo.formOutcome);
 
                 finalVariableMap.putAll(variablesFromFormSubmission);
             }
@@ -232,7 +233,7 @@ public class CaseTaskActivityBehavior extends ChildTaskActivityBehavior implemen
             }
             
         } else {
-            throw new FlowableException("Can only delete a child entity for a plan item with reference type " + ReferenceTypes.PLAN_ITEM_CHILD_CASE);
+            throw new FlowableException("Can only delete a child entity for a plan item with reference type " + ReferenceTypes.PLAN_ITEM_CHILD_CASE + " for " + delegatePlanItemInstance);
         }
     }
 
@@ -279,7 +280,7 @@ public class CaseTaskActivityBehavior extends ChildTaskActivityBehavior implemen
                 variableValue = cmmnRuntimeService.getVariable(planItemInstance.getReferenceId(), outParameter.getSource());
 
             }
-            caseInstance.setVariable(variableName, variableValue);
+            planItemInstance.setVariable(variableName, variableValue);
         }
     }
 

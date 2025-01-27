@@ -13,9 +13,11 @@
 package org.flowable.cmmn.engine.impl.agenda;
 
 import java.util.List;
+import java.util.Map;
 
 import org.flowable.cmmn.engine.impl.agenda.operation.ActivateAsyncPlanItemInstanceOperation;
 import org.flowable.cmmn.engine.impl.agenda.operation.ActivatePlanItemInstanceOperation;
+import org.flowable.cmmn.engine.impl.agenda.operation.AsyncLeaveActivePlanItemInstanceOperation;
 import org.flowable.cmmn.engine.impl.agenda.operation.ChangePlanItemInstanceToAvailableOperation;
 import org.flowable.cmmn.engine.impl.agenda.operation.CmmnOperation;
 import org.flowable.cmmn.engine.impl.agenda.operation.CompleteCaseInstanceOperation;
@@ -46,9 +48,11 @@ import org.flowable.cmmn.engine.impl.behavior.impl.ChildTaskActivityBehavior;
 import org.flowable.cmmn.engine.impl.criteria.PlanItemLifeCycleEvent;
 import org.flowable.cmmn.engine.impl.persistence.entity.CaseInstanceEntity;
 import org.flowable.cmmn.engine.impl.persistence.entity.PlanItemInstanceEntity;
+import org.flowable.cmmn.engine.impl.util.CommandContextUtil;
 import org.flowable.cmmn.engine.interceptor.MigrationContext;
 import org.flowable.cmmn.model.PlanItem;
 import org.flowable.common.engine.impl.agenda.AbstractAgenda;
+import org.flowable.common.engine.impl.agenda.AgendaFutureMaxWaitTimeoutProvider;
 import org.flowable.common.engine.impl.interceptor.CommandContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +69,8 @@ public class DefaultCmmnEngineAgenda extends AbstractAgenda implements CmmnEngin
     }
 
     public void addOperation(CmmnOperation operation) {
+
+        operation.onPlanned();
         
         int operationIndex = getOperationIndex(operation);
         if (operationIndex >= 0) {
@@ -101,6 +107,11 @@ public class DefaultCmmnEngineAgenda extends AbstractAgenda implements CmmnEngin
     }
 
     @Override
+    protected AgendaFutureMaxWaitTimeoutProvider getAgendaFutureMaxWaitTimeoutProvider() {
+        return CommandContextUtil.getCmmnEngineConfiguration(commandContext).getAgendaFutureMaxWaitTimeoutProvider();
+    }
+
+    @Override
     public void planInitPlanModelOperation(CaseInstanceEntity caseInstanceEntity) {
         addOperation(new InitPlanModelInstanceOperation(commandContext, caseInstanceEntity));
     }
@@ -133,6 +144,14 @@ public class DefaultCmmnEngineAgenda extends AbstractAgenda implements CmmnEngin
     @Override
     public void planEvaluateCriteriaOperation(String caseInstanceEntityId, PlanItemLifeCycleEvent lifeCycleEvent) {
         internalPlanEvaluateCriteria(caseInstanceEntityId, lifeCycleEvent, false);
+    }
+    
+    @Override
+    public void planEvaluateCriteriaOperation(String caseInstanceEntityId, MigrationContext migrationContext) {
+        EvaluateCriteriaOperation evaluateCriteriaOperation = new EvaluateCriteriaOperation(commandContext, caseInstanceEntityId, null);
+        evaluateCriteriaOperation.setEvaluateStagesAndCaseInstanceCompletion(false);
+        evaluateCriteriaOperation.setMigrationContext(migrationContext);
+        addOperation(evaluateCriteriaOperation);
     }
     
     protected void internalPlanEvaluateCriteria(String caseInstanceEntityId, PlanItemLifeCycleEvent planItemLifeCycleEvent, boolean evaluateCaseInstanceCompleted) {
@@ -211,7 +230,12 @@ public class DefaultCmmnEngineAgenda extends AbstractAgenda implements CmmnEngin
     public void planActivateAsyncPlanItemInstanceOperation(PlanItemInstanceEntity planItemInstanceEntity, String entryCriterionId) {
         addOperation(new ActivateAsyncPlanItemInstanceOperation(commandContext, planItemInstanceEntity, entryCriterionId));
     }
-    
+
+    @Override
+    public void planAsyncLeaveActivePlanItemInstanceOperation(PlanItemInstanceEntity planItemInstanceEntity, String transition, Map<String, String> transitionMetadata) {
+        addOperation(new AsyncLeaveActivePlanItemInstanceOperation(commandContext, planItemInstanceEntity, transition, transitionMetadata));
+    }
+
     @Override
     public void planDisablePlanItemInstanceOperation(PlanItemInstanceEntity planItemInstanceEntity) {
         addOperation(new DisablePlanItemInstanceOperation(commandContext, planItemInstanceEntity));        

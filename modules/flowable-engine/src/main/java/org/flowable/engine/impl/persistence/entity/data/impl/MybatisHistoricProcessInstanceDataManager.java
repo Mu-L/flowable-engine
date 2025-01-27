@@ -12,6 +12,7 @@
  */
 package org.flowable.engine.impl.persistence.entity.data.impl;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +62,12 @@ public class MybatisHistoricProcessInstanceDataManager extends AbstractProcessDa
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public List<String> findHistoricProcessInstanceIdsBySuperProcessInstanceIds(Collection<String> superProcessInstanceIds) {
+        return getDbSqlSession().selectList("selectHistoricProcessInstanceIdsBySuperProcessInstanceIds", createSafeInValuesList(superProcessInstanceIds));
+    }
+
+    @Override
     public long findHistoricProcessInstanceCountByQueryCriteria(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery) {
         setSafeInValueLists(historicProcessInstanceQuery);
         return (Long) getDbSqlSession().selectOne("selectHistoricProcessInstanceCountByQueryCriteria", historicProcessInstanceQuery);
@@ -79,6 +86,13 @@ public class MybatisHistoricProcessInstanceDataManager extends AbstractProcessDa
         setSafeInValueLists(historicProcessInstanceQuery);
         return getDbSqlSession().selectList("selectHistoricProcessInstancesWithVariablesByQueryCriteria", historicProcessInstanceQuery, getManagedEntityClass());
     }
+    
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<HistoricProcessInstance> findHistoricProcessInstanceIdsByQueryCriteria(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery) {
+        setSafeInValueLists(historicProcessInstanceQuery);
+        return getDbSqlSession().selectList("selectHistoricProcessInstanceIdsByQueryCriteria", historicProcessInstanceQuery, getManagedEntityClass());
+    }
 
     @Override
     @SuppressWarnings("unchecked")
@@ -94,6 +108,11 @@ public class MybatisHistoricProcessInstanceDataManager extends AbstractProcessDa
     @Override
     public void deleteHistoricProcessInstances(HistoricProcessInstanceQueryImpl historicProcessInstanceQuery) {
         getDbSqlSession().delete("bulkDeleteHistoricProcessInstances", historicProcessInstanceQuery, HistoricProcessInstanceEntityImpl.class);
+    }
+
+    @Override
+    public void bulkDeleteHistoricProcessInstances(Collection<String> processInstanceIds) {
+        getDbSqlSession().delete("bulkDeleteHistoricProcessInstancesByIds", createSafeInValuesList(processInstanceIds), HistoricProcessInstanceEntityImpl.class);
     }
 
     protected void setSafeInValueLists(HistoricProcessInstanceQueryImpl processInstanceQuery) {

@@ -42,6 +42,7 @@ import org.flowable.cmmn.engine.impl.util.CmmnLoggingSessionUtil;
 import org.flowable.cmmn.engine.impl.util.CommandContextUtil;
 import org.flowable.cmmn.engine.impl.util.EntityLinkUtil;
 import org.flowable.cmmn.engine.impl.util.EventInstanceCmmnUtil;
+import org.flowable.cmmn.engine.impl.util.IdentityLinkUtil;
 import org.flowable.cmmn.engine.impl.util.JobUtil;
 import org.flowable.cmmn.engine.interceptor.StartCaseInstanceAfterContext;
 import org.flowable.cmmn.engine.interceptor.StartCaseInstanceBeforeContext;
@@ -66,10 +67,10 @@ import org.flowable.form.api.FormFieldHandler;
 import org.flowable.form.api.FormInfo;
 import org.flowable.form.api.FormRepositoryService;
 import org.flowable.form.api.FormService;
+import org.flowable.identitylink.api.IdentityLinkType;
 import org.flowable.job.service.JobService;
 import org.flowable.job.service.impl.persistence.entity.JobEntity;
 import org.flowable.variable.api.history.HistoricVariableInstance;
-import org.flowable.variable.api.types.VariableTypes;
 import org.flowable.variable.service.VariableService;
 import org.flowable.variable.service.impl.el.NoExecutionVariableScope;
 import org.flowable.variable.service.impl.persistence.entity.VariableInstanceEntity;
@@ -272,7 +273,8 @@ public class CaseInstanceHelperImpl implements CaseInstanceHelper {
                 caseInstanceBuilder.getBusinessStatus(), caseInstanceBuilder.getName(), caseInstanceBuilder.getCallbackId(),
                 caseInstanceBuilder.getCallbackType(), caseInstanceBuilder.getReferenceId(), caseInstanceBuilder.getReferenceType(),
                 caseInstanceBuilder.getParentId(), caseInstanceBuilder.getVariables(), caseInstanceBuilder.getTransientVariables(),
-                caseInstanceBuilder.getTenantId(), caseModel.getInitiatorVariableName(), caseModel, caseDefinition, cmmnModel,
+                caseInstanceBuilder.getTenantId(), caseInstanceBuilder.getOwner(), caseInstanceBuilder.getAssignee(),
+                caseModel.getInitiatorVariableName(), caseModel, caseDefinition, cmmnModel,
                 caseInstanceBuilder.getOverrideDefinitionTenantId(), caseInstanceBuilder.getPredefinedCaseInstanceId());
 
         if (cmmnEngineConfiguration.getStartCaseInstanceInterceptor() != null) {
@@ -389,11 +391,12 @@ public class CaseInstanceHelperImpl implements CaseInstanceHelper {
                         FormFieldHandler formFieldHandler = cmmnEngineConfiguration.getFormFieldHandler();
                         // validate input before anything else
                         if (isFormFieldValidationEnabled(cmmnEngineConfiguration, planModel)) {
-                            formService.validateFormFields(formInfo, startFormVariables);
+                            formService.validateFormFields(null, "planModel", null, caseDefinition.getId(), 
+                                    ScopeTypes.CMMN, formInfo, startFormVariables);
                         }
                         // Extract the caseVariables from the form submission variables and pass them to the case
-                        Map<String, Object> caseVariables = formService.getVariablesFromFormSubmission(formInfo,
-                            startFormVariables, caseInstanceBuilder.getOutcome());
+                        Map<String, Object> caseVariables = formService.getVariablesFromFormSubmission(null, "planModel", null, 
+                                caseDefinition.getId(), ScopeTypes.CMMN, formInfo, startFormVariables, caseInstanceBuilder.getOutcome());
 
                         if (caseVariables != null) {
 	                        for (String variableName : caseVariables.keySet()) {
@@ -475,6 +478,16 @@ public class CaseInstanceHelperImpl implements CaseInstanceHelper {
         caseInstanceEntityManager.insert(caseInstanceEntity);
         caseInstanceEntity.setSatisfiedSentryPartInstances(new ArrayList<>(1));
 
+        // initialize owner / assignee, if provided
+        if (StringUtils.isNotEmpty(instanceBeforeContext.getOwnerId())) {
+            IdentityLinkUtil.createCaseInstanceIdentityLink(caseInstanceEntity, instanceBeforeContext.getOwnerId(), null,
+                IdentityLinkType.OWNER, cmmnEngineConfiguration);
+        }
+        if (StringUtils.isNotEmpty(instanceBeforeContext.getAssigneeId())) {
+            IdentityLinkUtil.createCaseInstanceIdentityLink(caseInstanceEntity, instanceBeforeContext.getAssigneeId(), null,
+                IdentityLinkType.ASSIGNEE, cmmnEngineConfiguration);
+        }
+
         return caseInstanceEntity;
     }
 
@@ -538,7 +551,6 @@ public class CaseInstanceHelperImpl implements CaseInstanceHelper {
      */
     protected Map<String, VariableInstanceEntity> createCaseVariablesFromHistoricCaseInstance(HistoricCaseInstance historicCaseInstance) {
         VariableService variableService = cmmnEngineConfiguration.getVariableServiceConfiguration().getVariableService();
-        VariableTypes variableTypes = cmmnEngineConfiguration.getVariableTypes();
         List<HistoricVariableInstance> variables = cmmnEngineConfiguration.getCmmnHistoryService()
             .createHistoricVariableInstanceQuery()
             .caseInstanceId(historicCaseInstance.getId())
@@ -550,14 +562,13 @@ public class CaseInstanceHelperImpl implements CaseInstanceHelper {
                 // only make a copy, if it is a case variable, we don't copy locally scoped ones (e.g. from stages), as those plan items are practically
                 // finished
                 if (variable.getSubScopeId() == null) {
-                    VariableInstanceEntity newVariable = variableService.createVariableInstance(
-                        variable.getVariableName(), variableTypes.getVariableType(variable.getVariableTypeName()), variable.getValue());
+                    VariableInstanceEntity newVariable = variableService.createVariableInstance(variable.getVariableName());
 
                     newVariable.setId(variable.getId());
                     newVariable.setScopeId(historicCaseInstance.getId());
                     newVariable.setScopeType(variable.getScopeType());
 
-                    variableService.insertVariableInstance(newVariable);
+                    variableService.insertVariableInstanceWithValue(newVariable, variable.getValue(), historicCaseInstance.getTenantId());
                     newVars.put(newVariable.getName(), newVariable);
                 }
             }

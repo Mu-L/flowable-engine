@@ -27,6 +27,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpStatus;
@@ -40,6 +41,7 @@ import org.flowable.cmmn.engine.test.CmmnDeployment;
 import org.flowable.cmmn.rest.service.BaseSpringRestTestCase;
 import org.flowable.cmmn.rest.service.HttpMultipartHelper;
 import org.flowable.cmmn.rest.service.api.CmmnRestUrls;
+import org.flowable.job.api.Job;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -162,6 +164,30 @@ public class CaseInstanceVariableResourceTest extends BaseSpringRestTestCase {
                         + "}");
     }
 
+    @CmmnDeployment(resources = { "org/flowable/cmmn/rest/service/api/repository/oneHumanTaskCase.cmmn" })
+    public void testGetCaseInstanceUUIDVariable() throws Exception {
+
+        CaseInstance caseInstance = runtimeService.createCaseInstanceBuilder().caseDefinitionKey("oneHumanTaskCase").start();
+        UUID someUUID = UUID.fromString("26da81fb-18a6-4c19-b7b4-6877a568bfe1");
+        runtimeService.setVariable(caseInstance.getId(), "variable", someUUID);
+
+        CloseableHttpResponse response = executeRequest(
+                new HttpGet(SERVER_URL_PREFIX + CmmnRestUrls.createRelativeResourceUrl(CmmnRestUrls.URL_CASE_INSTANCE_VARIABLE,
+                        caseInstance.getId(), "variable")), HttpStatus.SC_OK);
+
+        JsonNode responseNode = objectMapper.readTree(response.getEntity().getContent());
+
+        closeResponse(response);
+        assertThat(responseNode).isNotNull();
+        assertThatJson(responseNode)
+                .when(Option.IGNORING_EXTRA_FIELDS)
+                .isEqualTo("{"
+                        + "  name: 'variable',"
+                        + "  type: 'uuid',"
+                        + "  value: '" + someUUID + "'"
+                        + "}");
+    }
+
     /**
      * Test getting a case instance variable data. GET cmmn-runtime/case-instances/{caseInstanceId}/variables/{variableName}
      */
@@ -249,7 +275,7 @@ public class CaseInstanceVariableResourceTest extends BaseSpringRestTestCase {
      * PUT cmmn-runtime/case-instances/{caseInstanceId}/variables/{variableName}
      */
     @CmmnDeployment(resources = { "org/flowable/cmmn/rest/service/api/repository/oneHumanTaskCase.cmmn" })
-    public void testUpdateProcessVariable() throws Exception {
+    public void testUpdateCaseVariable() throws Exception {
         CaseInstance caseInstance = runtimeService.createCaseInstanceBuilder().caseDefinitionKey("oneHumanTaskCase")
                 .variables(Collections.singletonMap("overlappingVariable", (Object) "processValue")).start();
         runtimeService.setVariable(caseInstance.getId(), "myVar", "value");
@@ -271,6 +297,7 @@ public class CaseInstanceVariableResourceTest extends BaseSpringRestTestCase {
         assertThatJson(responseNode)
                 .when(Option.IGNORING_EXTRA_FIELDS)
                 .isEqualTo("{"
+                        + "  scope: 'global',"
                         + "  value: 'updatedValue'"
                         + "}");
 
@@ -288,7 +315,7 @@ public class CaseInstanceVariableResourceTest extends BaseSpringRestTestCase {
     }
 
     @CmmnDeployment(resources = { "org/flowable/cmmn/rest/service/api/repository/oneHumanTaskCase.cmmn" })
-    public void testUpdateInstantProcessVariable() throws Exception {
+    public void testUpdateInstantCaseVariable() throws Exception {
 
         Instant initial = Instant.parse("2019-12-03T12:32:45.583345Z");
         Instant tenDaysLater = initial.plus(10, ChronoUnit.DAYS);
@@ -316,7 +343,8 @@ public class CaseInstanceVariableResourceTest extends BaseSpringRestTestCase {
         assertThatJson(responseNode)
                 .when(Option.IGNORING_EXTRA_FIELDS)
                 .isEqualTo("{"
-                        + "  value: '2019-12-13T12:32:45.583345Z'"
+                        + "  scope: 'global',"
+                        + "  value: '2019-12-13T12:32:45.583Z'"
                         + "}");
     }
 
@@ -348,12 +376,13 @@ public class CaseInstanceVariableResourceTest extends BaseSpringRestTestCase {
         assertThatJson(responseNode)
                 .when(Option.IGNORING_EXTRA_FIELDS)
                 .isEqualTo("{"
+                        + "  scope: 'global',"
                         + "  value: '2020-01-28'"
                         + "}");
     }
 
     @CmmnDeployment(resources = { "org/flowable/cmmn/rest/service/api/repository/oneHumanTaskCase.cmmn" })
-    public void testUpdateLocalDateTimeProcessVariable() throws Exception {
+    public void testUpdateLocalDateTimeCaseVariable() throws Exception {
 
         LocalDateTime initial = LocalDateTime.parse("2020-01-18T12:32:45");
         LocalDateTime tenDaysLater = initial.plusDays(10);
@@ -380,6 +409,7 @@ public class CaseInstanceVariableResourceTest extends BaseSpringRestTestCase {
         assertThatJson(responseNode)
                 .when(Option.IGNORING_EXTRA_FIELDS)
                 .isEqualTo("{"
+                        + "  scope: 'global',"
                         + "  value: '2020-01-28T12:32:45'"
                         + "}");
     }
@@ -412,6 +442,7 @@ public class CaseInstanceVariableResourceTest extends BaseSpringRestTestCase {
                 .isEqualTo("{"
                         + "  name: 'binaryVariable',"
                         + "  value: null,"
+                        + "  scope: 'global',"
                         + "  type: 'binary',"
                         + "  valueUrl: '" + SERVER_URL_PREFIX + CmmnRestUrls
                         .createRelativeResourceUrl(CmmnRestUrls.URL_CASE_INSTANCE_VARIABLE_DATA, caseInstance.getId(), "binaryVariable") + "'"
@@ -421,5 +452,71 @@ public class CaseInstanceVariableResourceTest extends BaseSpringRestTestCase {
         Object variableValue = runtimeService.getVariable(caseInstance.getId(), "binaryVariable");
         assertThat(variableValue).isInstanceOf(byte[].class);
         assertThat(new String((byte[]) variableValue)).isEqualTo("This is binary content");
+    }
+
+    @CmmnDeployment(resources = { "org/flowable/cmmn/rest/service/api/repository/oneHumanTaskCase.cmmn" })
+    public void testUpdateUUIDCaseVariable() throws Exception {
+
+        UUID someUUID = UUID.fromString("87b859b2-d0c7-4845-93c2-e96ef69115b5");
+        UUID someUUID2 = UUID.fromString("b2233abf-f84f-426f-b978-0d249b90cc45");
+        CaseInstance caseInstance = runtimeService.createCaseInstanceBuilder().caseDefinitionKey("oneHumanTaskCase")
+                .variables(Collections.singletonMap("overlappingVariable", (Object) "caseValue")).start();
+        runtimeService.setVariable(caseInstance.getId(), "uuidVariable", someUUID);
+
+        // Update variable
+        ObjectNode requestNode = objectMapper.createObjectNode();
+        requestNode.put("name", "uuidVariable");
+        requestNode.put("value", someUUID2.toString());
+        requestNode.put("type", "uuid");
+
+        HttpPut httpPut = new HttpPut(
+                SERVER_URL_PREFIX + CmmnRestUrls.createRelativeResourceUrl(CmmnRestUrls.URL_CASE_INSTANCE_VARIABLE, caseInstance.getId(), "uuidVariable"));
+        httpPut.setEntity(new StringEntity(requestNode.toString()));
+        CloseableHttpResponse response = executeRequest(httpPut, HttpStatus.SC_OK);
+
+        assertThat(runtimeService.getVariable(caseInstance.getId(), "uuidVariable")).isEqualTo(someUUID2);
+
+        JsonNode responseNode = objectMapper.readTree(response.getEntity().getContent());
+        closeResponse(response);
+        assertThat(responseNode).isNotNull();
+        assertThatJson(responseNode)
+                .when(Option.IGNORING_EXTRA_FIELDS)
+                .isEqualTo("{"
+                        + "  scope: 'global',"
+                        + "  value: 'b2233abf-f84f-426f-b978-0d249b90cc45'"
+                        + "}");
+    }
+    
+    @CmmnDeployment(resources = { "org/flowable/cmmn/rest/service/api/repository/oneHumanTaskCase.cmmn" })
+    public void testUpdateCaseVariableAsync() throws Exception {
+        CaseInstance caseInstance = runtimeService.createCaseInstanceBuilder().caseDefinitionKey("oneHumanTaskCase")
+                .variables(Collections.singletonMap("overlappingVariable", (Object) "processValue")).start();
+        runtimeService.setVariable(caseInstance.getId(), "myVar", "value");
+
+        // Update variable
+        ObjectNode requestNode = objectMapper.createObjectNode();
+        requestNode.put("name", "myVar");
+        requestNode.put("value", "updatedValue");
+        requestNode.put("type", "string");
+
+        HttpPut httpPut = new HttpPut(
+                SERVER_URL_PREFIX + CmmnRestUrls.createRelativeResourceUrl(CmmnRestUrls.URL_CASE_INSTANCE_VARIABLE_ASYNC, caseInstance.getId(), "myVar"));
+        httpPut.setEntity(new StringEntity(requestNode.toString()));
+        CloseableHttpResponse response = executeRequest(httpPut, HttpStatus.SC_NO_CONTENT);
+        closeResponse(response);
+        
+        assertThat(runtimeService.getVariable(caseInstance.getId(), "myVar")).isEqualTo("value");
+        
+        Job job = managementService.createJobQuery().caseInstanceId(caseInstance.getId()).singleResult();
+        assertThat(job).isNotNull();
+        
+        managementService.executeJob(job.getId());
+        
+        assertThat(runtimeService.getVariable(caseInstance.getId(), "myVar")).isEqualTo("updatedValue");
+
+        // Try updating with mismatch between URL and body variableName
+        requestNode.put("name", "unexistingVariable");
+        httpPut.setEntity(new StringEntity(requestNode.toString()));
+        closeResponse(executeRequest(httpPut, HttpStatus.SC_BAD_REQUEST));
     }
 }

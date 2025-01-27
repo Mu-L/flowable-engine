@@ -38,6 +38,7 @@ import org.flowable.common.rest.variable.LongRestVariableConverter;
 import org.flowable.common.rest.variable.RestVariableConverter;
 import org.flowable.common.rest.variable.ShortRestVariableConverter;
 import org.flowable.common.rest.variable.StringRestVariableConverter;
+import org.flowable.common.rest.variable.UUIDRestVariableConverter;
 import org.flowable.dmn.api.DmnDecision;
 import org.flowable.engine.form.FormData;
 import org.flowable.engine.form.FormProperty;
@@ -66,6 +67,8 @@ import org.flowable.idm.api.Group;
 import org.flowable.idm.api.User;
 import org.flowable.job.api.HistoryJob;
 import org.flowable.job.api.Job;
+import org.flowable.job.service.impl.persistence.entity.HistoryJobEntity;
+import org.flowable.job.service.impl.persistence.entity.JobInfoEntity;
 import org.flowable.rest.service.api.engine.AttachmentResponse;
 import org.flowable.rest.service.api.engine.CommentResponse;
 import org.flowable.rest.service.api.engine.EventResponse;
@@ -738,7 +741,19 @@ public class RestResponseFactory {
             result.setProcessInstanceUrl(urlBuilder.buildUrl(RestUrls.URL_PROCESS_INSTANCE, variableInstance.getProcessInstanceId()));
         }
         result.setTaskId(variableInstance.getTaskId());
-        result.setVariable(createRestVariable(variableInstance.getName(), variableInstance.getValue(), null, variableInstance.getId(), VARIABLE_VARINSTANCE, false, urlBuilder));
+        result.setExecutionId(variableInstance.getExecutionId());
+
+        RestVariableScope scope;
+        if (variableInstance.getExecutionId() != null && !variableInstance.getExecutionId().equals(variableInstance.getProcessInstanceId())
+                || variableInstance.getTaskId() != null) {
+            scope = RestVariableScope.LOCAL;
+        } else {
+            scope = RestVariableScope.GLOBAL;
+        }
+
+        result.setVariable(
+                createRestVariable(variableInstance.getName(), variableInstance.getValue(), scope, variableInstance.getId(), VARIABLE_VARINSTANCE, false,
+                        urlBuilder));
         return result;
     }
 
@@ -982,8 +997,18 @@ public class RestResponseFactory {
         if (variableInstance.getProcessInstanceId() != null) {
             result.setProcessInstanceUrl(urlBuilder.buildUrl(RestUrls.URL_HISTORIC_PROCESS_INSTANCE, variableInstance.getProcessInstanceId()));
         }
+
+        RestVariableScope scope;
+        if (variableInstance.getExecutionId() != null && !variableInstance.getExecutionId().equals(variableInstance.getProcessInstanceId())
+                || variableInstance.getTaskId() != null) {
+            scope = RestVariableScope.LOCAL;
+        } else {
+            scope = RestVariableScope.GLOBAL;
+        }
         result.setTaskId(variableInstance.getTaskId());
-        result.setVariable(createRestVariable(variableInstance.getVariableName(), variableInstance.getValue(), null, variableInstance.getId(), VARIABLE_HISTORY_VARINSTANCE, false, urlBuilder));
+        result.setExecutionId(variableInstance.getExecutionId());
+        result.setVariable(createRestVariable(variableInstance.getVariableName(), variableInstance.getValue(), scope, variableInstance.getId(),
+                VARIABLE_HISTORY_VARINSTANCE, false, urlBuilder));
         return result;
     }
 
@@ -1136,6 +1161,12 @@ public class RestResponseFactory {
         response.setElementName(job.getElementName());
         response.setRetries(job.getRetries());
         response.setCreateTime(job.getCreateTime());
+        response.setHandlerType(job.getJobHandlerType());
+        if (job instanceof JobInfoEntity) {
+            JobInfoEntity jobInfoEntity = (JobInfoEntity) job;
+            response.setLockOwner(jobInfoEntity.getLockOwner());
+            response.setLockExpirationTime(jobInfoEntity.getLockExpirationTime());
+        }
         response.setTenantId(job.getTenantId());
 
         response.setUrl(urlBuilder.buildUrl(urlJobSegments, job.getId()));
@@ -1178,6 +1209,11 @@ public class RestResponseFactory {
         response.setJobHandlerType(job.getJobHandlerType());
         response.setJobHandlerConfiguration(job.getJobHandlerConfiguration());
         response.setCustomValues(job.getCustomValues());
+        if (job instanceof HistoryJobEntity) {
+            HistoryJobEntity historyJobEntity = (HistoryJobEntity) job;
+            response.setLockOwner(historyJobEntity.getLockOwner());
+            response.setLockExpirationTime(historyJobEntity.getLockExpirationTime());
+        }
         response.setTenantId(job.getTenantId());
 
         response.setUrl(urlBuilder.buildUrl(RestUrls.URL_HISTORY_JOB, job.getId()));
@@ -1232,8 +1268,8 @@ public class RestResponseFactory {
         response.setId(batchPart.getId());
         response.setBatchId(batchPart.getBatchId());
         response.setBatchType(batchPart.getBatchType());
-        response.setSearchKey(batchPart.getBatchSearchKey());
-        response.setSearchKey2(batchPart.getBatchSearchKey2());
+        response.setSearchKey(batchPart.getSearchKey());
+        response.setSearchKey2(batchPart.getSearchKey2());
         response.setScopeId(batchPart.getScopeId());
         response.setSubScopeId(batchPart.getSubScopeId());
         response.setScopeType(batchPart.getScopeType());
@@ -1493,6 +1529,7 @@ public class RestResponseFactory {
         variableConverters.add(new LocalDateRestVariableConverter());
         variableConverters.add(new LocalDateTimeRestVariableConverter());
         variableConverters.add(new JsonObjectRestVariableConverter(objectMapper));
+        variableConverters.add(new UUIDRestVariableConverter());
     }
 
     protected String formatUrl(String serverRootUrl, String[] fragments, Object... arguments) {

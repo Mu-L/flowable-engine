@@ -59,7 +59,7 @@ public class EngineConfiguration {
     @Bean
     public DataSource dataSource() {
         HikariDataSource dataSource = new HikariDataSource();
-        dataSource.setJdbcUrl("jdbc:h2:mem:flowable;DB_CLOSE_DELAY=1000");
+        dataSource.setJdbcUrl(jdbcUrl);
         dataSource.setDriverClassName(jdbcDriver);
         dataSource.setUsername(jdbcUsername);
         dataSource.setPassword(jdbcPassword);
@@ -156,11 +156,6 @@ public class EngineConfiguration {
     @Bean
     public EventRegistry eventRegistry(ProcessEngine processEngine) {
         return getEventRegistryEngineConfiguration(processEngine).getEventRegistry();
-    }
-    
-    @Bean
-    public EventRegistryEngineConfiguration eventRegistryEngineConfiguration(ProcessEngine processEngine) {
-        return getEventRegistryEngineConfiguration(processEngine);
     }
     
     @Bean

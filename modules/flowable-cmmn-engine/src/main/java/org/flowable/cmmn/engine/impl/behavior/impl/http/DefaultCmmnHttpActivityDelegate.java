@@ -32,7 +32,6 @@ import org.flowable.cmmn.model.ImplementationType;
 import org.flowable.common.engine.api.FlowableException;
 import org.flowable.common.engine.api.async.AsyncTaskInvoker;
 import org.flowable.common.engine.api.variable.VariableContainer;
-import org.flowable.http.common.api.HttpRequest;
 import org.flowable.http.common.api.HttpResponse;
 import org.flowable.http.common.api.client.FlowableHttpClient;
 import org.flowable.http.common.api.delegate.HttpRequestHandler;
@@ -65,7 +64,7 @@ public class DefaultCmmnHttpActivityDelegate extends BaseHttpActivityDelegate im
 
     @Override
     public CompletableFuture<ExecutionData> execute(DelegatePlanItemInstance planItemInstance, AsyncTaskInvoker taskInvoker) {
-        HttpRequest request;
+        RequestData request;
 
         HttpServiceTask httpServiceTask = (HttpServiceTask) planItemInstance.getPlanItemDefinition();
         try {
@@ -75,7 +74,8 @@ public class DefaultCmmnHttpActivityDelegate extends BaseHttpActivityDelegate im
             if (e instanceof FlowableException) {
                 throw (FlowableException) e;
             } else {
-                throw new FlowableException(HTTP_TASK_REQUEST_FIELD_INVALID + " in execution " + planItemInstance.getId(), e);
+                throw new FlowableException(HTTP_TASK_REQUEST_FIELD_INVALID + " in plan item instance " + planItemInstance.getId() + " in plan item "
+                        + planItemInstance.getPlanItemDefinitionId() + " in case definition " + planItemInstance.getCaseDefinitionId(), e);
             }
         }
 
@@ -83,11 +83,11 @@ public class DefaultCmmnHttpActivityDelegate extends BaseHttpActivityDelegate im
         HttpRequestHandler httpRequestHandler = createHttpRequestHandler(httpServiceTask.getHttpRequestHandler(), cmmnEngineConfiguration);
 
         if (httpRequestHandler != null) {
-            httpRequestHandler.handleHttpRequest(planItemInstance, request, null);
+            httpRequestHandler.handleHttpRequest(planItemInstance, request.getHttpRequest(), null);
         }
 
         // Validate request
-        validateRequest(request);
+        validateRequest(request.getHttpRequest());
 
         boolean parallelInSameTransaction;
         if (httpServiceTask.getParallelInSameTransaction() != null) {
@@ -102,7 +102,7 @@ public class DefaultCmmnHttpActivityDelegate extends BaseHttpActivityDelegate im
     @Override
     public void afterExecution(DelegatePlanItemInstance planItemInstance, ExecutionData result) {
 
-        HttpRequest request = result.getRequest();
+        RequestData request = result.getRequest();
         HttpResponse response = result.getResponse();
 
         Throwable resultException = result.getException();

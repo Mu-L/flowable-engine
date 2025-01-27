@@ -12,6 +12,7 @@
  */
 package org.flowable.cmmn.engine.impl.history;
 
+import java.util.Collection;
 import java.util.Date;
 
 import org.flowable.cmmn.api.repository.CaseDefinition;
@@ -45,6 +46,8 @@ public interface CmmnHistoryManager {
     void recordMilestoneReached(MilestoneInstanceEntity milestoneInstanceEntity);
 
     void recordHistoricCaseInstanceDeleted(String caseInstanceId, String tenantId);
+    
+    void recordBulkDeleteHistoricCaseInstances(Collection<String> caseInstanceIds);
 
     void recordIdentityLinkCreated(IdentityLinkEntity identityLink);
 
@@ -62,7 +65,7 @@ public interface CmmnHistoryManager {
 
     void recordTaskCreated(TaskEntity task);
 
-    void recordTaskEnd(TaskEntity task, String deleteReason, Date endTime);
+    void recordTaskEnd(TaskEntity task, String userId, String deleteReason, Date endTime);
 
     void recordTaskInfoChange(TaskEntity taskEntity, Date changeTime);
 

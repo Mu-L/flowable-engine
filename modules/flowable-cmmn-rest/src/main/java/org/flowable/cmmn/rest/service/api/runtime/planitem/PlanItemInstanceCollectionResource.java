@@ -16,8 +16,6 @@ package org.flowable.cmmn.rest.service.api.runtime.planitem;
 import java.util.Arrays;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.flowable.common.rest.api.DataResponse;
 import org.flowable.common.rest.api.RequestUtil;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -58,6 +56,8 @@ public class PlanItemInstanceCollectionResource extends PlanItemInstanceBaseReso
             @ApiImplicitParam(name = "createdBefore", dataType = "date", value = "Only return plan item instances which are created before the given date.", paramType = "query"),
             @ApiImplicitParam(name = "createdAfter", dataType = "date", value = "Only return plan item instances which are created after the given date.", paramType = "query"),
             @ApiImplicitParam(name = "startUserId", dataType = "string", value = "Only return plan item instances which are started by the given user id.", paramType = "query"),
+            @ApiImplicitParam(name = "includeEnded", dataType = "boolean", value = "Define if ended plan item instances should be included.", paramType = "query"),
+            @ApiImplicitParam(name = "includeLocalVariables", dataType = "boolean", value = "Indication to include local variables in the result.", paramType = "query"),
             @ApiImplicitParam(name = "tenantId", dataType = "string", value = "Only return plan item instances with the given tenantId.", paramType = "query"),
             @ApiImplicitParam(name = "withoutTenantId", dataType = "boolean", value = "If true, only returns plan item instances without a tenantId set. If false, the withoutTenantId parameter is ignored.", paramType = "query"),
             @ApiImplicitParam(name = "sort", dataType = "string", value = "Property to sort on, to be used together with the order.", allowableValues = "name, createTime, startTime", paramType = "query"),
@@ -67,7 +67,7 @@ public class PlanItemInstanceCollectionResource extends PlanItemInstanceBaseReso
             @ApiResponse(code = 400, message = "Indicates a parameter was passed in the wrong format . The status-message contains additional information.")
     })
     @GetMapping(value = "/cmmn-runtime/plan-item-instances", produces = "application/json")
-    public DataResponse<PlanItemInstanceResponse> getPlanItemInstances(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<PlanItemInstanceResponse> getPlanItemInstances(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         // Populate query based on request
         PlanItemInstanceQueryRequest queryRequest = new PlanItemInstanceQueryRequest();
 
@@ -128,6 +128,14 @@ public class PlanItemInstanceCollectionResource extends PlanItemInstanceBaseReso
             queryRequest.setStartUserId(allRequestParams.get("startUserId"));
         }
         
+        if (allRequestParams.containsKey("includeEnded")) {
+            queryRequest.setIncludeEnded(RequestUtil.getBoolean(allRequestParams, "includeEnded", false));
+        }
+
+        if (allRequestParams.containsKey("includeLocalVariables")) {
+            queryRequest.setIncludeLocalVariables(RequestUtil.getBoolean(allRequestParams, "includeLocalVariables", false));
+        }
+        
         if (allRequestParams.containsKey("name")) {
             queryRequest.setName(allRequestParams.get("name"));
         }
@@ -142,6 +150,6 @@ public class PlanItemInstanceCollectionResource extends PlanItemInstanceBaseReso
             }
         }
 
-        return getQueryResponse(queryRequest, allRequestParams, request.getRequestURL().toString().replace("/cmmn-runtime/plan-item-instances", ""));
+        return getQueryResponse(queryRequest, allRequestParams);
     }
 }

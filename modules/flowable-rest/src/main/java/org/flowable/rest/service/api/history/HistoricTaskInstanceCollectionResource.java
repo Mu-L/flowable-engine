@@ -16,8 +16,6 @@ package org.flowable.rest.service.api.history;
 import java.util.Arrays;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.flowable.common.rest.api.DataResponse;
 import org.flowable.common.rest.api.RequestUtil;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -58,9 +56,13 @@ public class HistoricTaskInstanceCollectionResource extends HistoricTaskInstance
             @ApiImplicitParam(name = "taskDefinitionKeys", dataType = "string", value = "The task definition key for tasks part of a process", paramType = "query"),
             @ApiImplicitParam(name = "taskName", dataType = "string", value = "The task name of the historic task instance.", paramType = "query"),
             @ApiImplicitParam(name = "taskNameLike", dataType = "string", value = "The task name with like operator for the historic task instance.", paramType = "query"),
+            @ApiImplicitParam(name = "taskNameLikeIgnoreCase", dataType = "string", value = "The task name with like operator for the historic task instance ignoring case.", paramType = "query"),
             @ApiImplicitParam(name = "taskDescription", dataType = "string", value = "The task description of the historic task instance.", paramType = "query"),
             @ApiImplicitParam(name = "taskDescriptionLike", dataType = "string", value = "The task description with like operator for the historic task instance.", paramType = "query"),
             @ApiImplicitParam(name = "taskCategory", dataType = "string", value = "Select tasks with the given category. Note that this is the task category, not the category of the process definition (namespace within the BPMN Xml).", paramType = "query"),
+            @ApiImplicitParam(name = "taskCategoryIn", dataType = "string", value = "Select tasks with the given categories. Note that this is the task category, not the category of the process definition (namespace within the BPMN Xml).", paramType = "query"),
+            @ApiImplicitParam(name = "taskCategoryNotIn", dataType = "string", value = "Select tasks not assigned to the given categories. Note that this is the task category, not the category of the process definition (namespace within the BPMN Xml).", paramType = "query"),
+            @ApiImplicitParam(name = "taskWithoutCategory", dataType = "string", value = "Select tasks with no category assigned. Note that this is the task category, not the category of the process definition (namespace within the BPMN Xml).", paramType = "query"),
             @ApiImplicitParam(name = "taskDeleteReason", dataType = "string", value = "The task delete reason of the historic task instance.", paramType = "query"),
             @ApiImplicitParam(name = "taskDeleteReasonLike", dataType = "string", value = "The task delete reason with like operator for the historic task instance.", paramType = "query"),
             @ApiImplicitParam(name = "taskAssignee", dataType = "string", value = "The assignee of the historic task instance.", paramType = "query"),
@@ -94,13 +96,15 @@ public class HistoricTaskInstanceCollectionResource extends HistoricTaskInstance
             @ApiImplicitParam(name = "tenantId", dataType = "string", value = "Only return historic task instances with the given tenantId.", paramType = "query"),
             @ApiImplicitParam(name = "tenantIdLike", dataType = "string", value = "Only return historic task instances with a tenantId like the given value.", paramType = "query"),
             @ApiImplicitParam(name = "withoutTenantId", dataType = "boolean", value = "If true, only returns historic task instances without a tenantId set. If false, the withoutTenantId parameter is ignored.", paramType = "query"),
+            @ApiImplicitParam(name = "rootScopeId", dataType = "string", value = "Only return case instances which have the given root scope id (that can be a process or case instance ID).", paramType = "query"),
+            @ApiImplicitParam(name = "parentScopeId", dataType = "string", value = "Only return case instances which have the given parent scope id (that can be a process or case instance ID).", paramType = "query"),
 
     })
     @ApiResponses(value = {
             @ApiResponse(code = 200, message = "Indicates that historic task instances could be queried."),
             @ApiResponse(code = 404, message = "Indicates an parameter was passed in the wrong format. The status-message contains additional information.") })
     @GetMapping(value = "/history/historic-task-instances", produces = "application/json")
-    public DataResponse<HistoricTaskInstanceResponse> getHistoricProcessInstances(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<HistoricTaskInstanceResponse> getHistoricProcessInstances(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         // Populate query based on request
         HistoricTaskInstanceQueryRequest queryRequest = new HistoricTaskInstanceQueryRequest();
 
@@ -159,6 +163,10 @@ public class HistoricTaskInstanceCollectionResource extends HistoricTaskInstance
         if (allRequestParams.get("taskNameLike") != null) {
             queryRequest.setTaskNameLike(allRequestParams.get("taskNameLike"));
         }
+        
+        if (allRequestParams.get("taskNameLikeIgnoreCase") != null) {
+            queryRequest.setTaskNameLikeIgnoreCase(allRequestParams.get("taskNameLikeIgnoreCase"));
+        }
 
         if (allRequestParams.get("taskDescription") != null) {
             queryRequest.setTaskDescription(allRequestParams.get("taskDescription"));
@@ -178,6 +186,18 @@ public class HistoricTaskInstanceCollectionResource extends HistoricTaskInstance
 
         if (allRequestParams.containsKey("taskCategory")) {
             queryRequest.setTaskCategory(allRequestParams.get("taskCategory"));
+        }
+
+        if (allRequestParams.containsKey("taskCategoryIn")) {
+            queryRequest.setTaskCategoryIn(Arrays.asList(allRequestParams.get("taskCategoryIn").split(",")));
+        }
+
+        if (allRequestParams.containsKey("taskCategoryNotIn")) {
+            queryRequest.setTaskCategoryNotIn(Arrays.asList(allRequestParams.get("taskCategoryNotIn").split(",")));
+        }
+
+        if (allRequestParams.containsKey("taskWithoutCategory") && Boolean.parseBoolean(allRequestParams.get("taskWithoutCategory"))) {
+            queryRequest.setTaskWithoutCategory(Boolean.TRUE);
         }
 
         if (allRequestParams.get("taskDeleteReason") != null) {
@@ -292,7 +312,7 @@ public class HistoricTaskInstanceCollectionResource extends HistoricTaskInstance
             queryRequest.setTaskCandidateGroup(allRequestParams.get("taskCandidateGroup"));
         }
 
-        if (allRequestParams.containsKey("ignoreTaskAssignee") && Boolean.valueOf(allRequestParams.get("ignoreTaskAssignee"))) {
+        if (allRequestParams.containsKey("ignoreTaskAssignee") && Boolean.parseBoolean(allRequestParams.get("ignoreTaskAssignee"))) {
             queryRequest.setIgnoreTaskAssignee(true);
         }
 
@@ -316,6 +336,14 @@ public class HistoricTaskInstanceCollectionResource extends HistoricTaskInstance
             queryRequest.setPropagatedStageInstanceId(allRequestParams.get("propagatedStageInstanceId"));
         }
 
-        return getQueryResponse(queryRequest, allRequestParams, request.getRequestURL().toString().replace("/history/historic-task-instances", ""));
+        if (allRequestParams.containsKey("rootScopeId")) {
+            queryRequest.setRootScopeId(allRequestParams.get("rootScopeId"));
+        }
+
+        if (allRequestParams.containsKey("parentScopeId")) {
+            queryRequest.setParentScopeId(allRequestParams.get("parentScopeId"));
+        }
+
+        return getQueryResponse(queryRequest, allRequestParams);
     }
 }

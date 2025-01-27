@@ -18,7 +18,6 @@ import static org.assertj.core.api.Assertions.tuple;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -63,7 +62,7 @@ public class DefaultProcessValidatorTest {
         assertThat(bpmnModel).isNotNull();
 
         List<ValidationError> allErrors = processValidator.validate(bpmnModel);
-        assertThat(allErrors).hasSize(71);
+        assertThat(allErrors).hasSize(74);
 
         String setName = ValidatorSetNames.FLOWABLE_EXECUTABLE_PROCESS; // shortening it a bit
 
@@ -80,9 +79,11 @@ public class DefaultProcessValidatorTest {
         assertProcessElementError(problems.get(0));
 
         // Execution listeners
-        problems = findErrors(allErrors, setName, Problems.EXECUTION_LISTENER_IMPLEMENTATION_MISSING, 2);
+        problems = findErrors(allErrors, setName, Problems.EXECUTION_LISTENER_IMPLEMENTATION_MISSING, 3);
         assertProcessElementError(problems.get(0));
-        assertCommonProblemFieldForActivity(problems.get(1));
+        assertCommonProblemFieldForActivity(problems.get(2));
+        ValidationError missingScriptInfoExecutionListener = problems.get(1);
+        assertThat(missingScriptInfoExecutionListener.getDefaultDescription()).contains("Listener of type 'script' expects a <script> child element");
 
         // Association
         problems = findErrors(allErrors, setName, Problems.ASSOCIATION_INVALID_SOURCE_REFERENCE, 1);
@@ -116,8 +117,15 @@ public class DefaultProcessValidatorTest {
         assertCommonProblemFieldForActivity(problems.get(0));
 
         // User task
-        problems = findErrors(allErrors, setName, Problems.USER_TASK_LISTENER_IMPLEMENTATION_MISSING, 1);
+        problems = findErrors(allErrors, setName, Problems.USER_TASK_LISTENER_IMPLEMENTATION_MISSING, 2);
         assertCommonProblemFieldForActivity(problems.get(0));
+        ValidationError missingScriptInfo = problems.get(1);
+        assertCommonProblemFieldForActivity(missingScriptInfo);
+        assertThat(missingScriptInfo.getDefaultDescription()).contains("Listener of type 'script' expects a <script> child element");
+
+        problems = findErrors(allErrors, setName, Problems.USER_TASK_LISTENER_MISSING_EVENT, 1);
+        assertCommonProblemFieldForActivity(problems.get(0));
+        assertThat(problems.get(0).getDefaultDescription()).contains("Element 'event' is mandatory on taskListener");
 
         // Service task
         problems = findErrors(allErrors, setName, Problems.SERVICE_TASK_RESULT_VAR_NAME_WITH_DELEGATE, 1);
@@ -251,7 +259,7 @@ public class DefaultProcessValidatorTest {
     }
 
     @Test
-    public void testWarningError() throws UnsupportedEncodingException, XMLStreamException {
+    public void testWarningError() throws XMLStreamException {
         String flowWithoutConditionNoDefaultFlow = "<?xml version='1.0' encoding='UTF-8'?>"
                 + "<definitions id='definitions' xmlns='http://www.omg.org/spec/BPMN/20100524/MODEL' xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance' xmlns:activiti='http://activiti.org/bpmn' targetNamespace='Examples'>"
                 + "  <process id='exclusiveGwDefaultSequenceFlow'> " + "    <startEvent id='theStart' /> "
@@ -414,6 +422,26 @@ public class DefaultProcessValidatorTest {
                         tuple(Problems.MAIL_TASK_NO_RECIPIENT, "No recipient is defined on the mail activity", "sendMailWithoutanything", false)
                 );
     }
+    
+    @Test
+    public void testEventSubProcessWithoutVariableName() throws Exception {
+
+        InputStream xmlStream = this.getClass().getClassLoader()
+                .getResourceAsStream("org/flowable/engine/test/validation/missingVariableEventListenerVariableName.xml");
+        XMLInputFactory xif = XMLInputFactory.newInstance();
+        InputStreamReader in = new InputStreamReader(xmlStream, StandardCharsets.UTF_8);
+        XMLStreamReader xtr = xif.createXMLStreamReader(in);
+        BpmnModel bpmnModel = new BpmnXMLConverter().convertToBpmnModel(xtr);
+        assertThat(bpmnModel).isNotNull();
+
+        List<ValidationError> allErrors = processValidator.validate(bpmnModel);
+        assertThat(allErrors).hasSize(1);
+        ValidationError error = allErrors.get(0);
+        assertThat(error.getProblem()).isEqualTo(Problems.EVENT_SUBPROCESS_INVALID_START_EVENT_VARIABLE_NAME);
+        assertThat(error.getDefaultDescription()).isEqualTo("variable name is required for variable listener with activity id variableListenerStartEvent");
+
+    }
+
 
     protected void assertCommonProblemFieldForActivity(ValidationError error) {
         assertProcessElementError(error);

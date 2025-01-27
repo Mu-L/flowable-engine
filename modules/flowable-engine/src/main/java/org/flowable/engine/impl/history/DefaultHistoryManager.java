@@ -13,6 +13,7 @@
 
 package org.flowable.engine.impl.history;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,7 @@ import org.flowable.common.engine.api.delegate.event.FlowableEngineEventType;
 import org.flowable.common.engine.api.delegate.event.FlowableEventDispatcher;
 import org.flowable.common.engine.api.scope.ScopeTypes;
 import org.flowable.common.engine.impl.history.HistoryLevel;
+import org.flowable.common.engine.impl.util.CollectionUtil;
 import org.flowable.engine.delegate.event.impl.FlowableEventBuilder;
 import org.flowable.engine.history.HistoricActivityInstance;
 import org.flowable.engine.history.HistoricProcessInstance;
@@ -41,6 +43,7 @@ import org.flowable.entitylink.service.impl.persistence.entity.HistoricEntityLin
 import org.flowable.identitylink.service.HistoricIdentityLinkService;
 import org.flowable.identitylink.service.impl.persistence.entity.HistoricIdentityLinkEntity;
 import org.flowable.identitylink.service.impl.persistence.entity.IdentityLinkEntity;
+import org.flowable.task.api.Task;
 import org.flowable.task.api.history.HistoricTaskInstance;
 import org.flowable.task.api.history.HistoricTaskLogEntryBuilder;
 import org.flowable.task.service.HistoricTaskService;
@@ -60,6 +63,8 @@ import org.slf4j.LoggerFactory;
 public class DefaultHistoryManager extends AbstractHistoryManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DefaultHistoryManager.class.getName());
+    
+    public static final int MAX_SUB_PROCESS_INSTANCES = 1000;
 
     public DefaultHistoryManager(ProcessEngineConfigurationImpl processEngineConfiguration) {
         super(processEngineConfiguration);
@@ -124,7 +129,11 @@ public class DefaultHistoryManager extends AbstractHistoryManager {
             HistoricProcessInstanceEntity historicProcessInstance = getHistoricProcessInstanceEntityManager().findById(processInstanceId);
 
             getHistoricDetailEntityManager().deleteHistoricDetailsByProcessInstanceId(processInstanceId);
-            processEngineConfiguration.getVariableServiceConfiguration().getHistoricVariableService().deleteHistoricVariableInstancesByProcessInstanceId(processInstanceId);
+
+            if (getHistoryConfigurationSettings().isHistoryEnabledForVariables(processDefinitionId)) {
+                processEngineConfiguration.getVariableServiceConfiguration().getHistoricVariableService()
+                        .deleteHistoricVariableInstancesByProcessInstanceId(processInstanceId);
+            }
             getHistoricActivityInstanceEntityManager().deleteHistoricActivityInstancesByProcessInstanceId(processInstanceId);
             TaskHelper.deleteHistoricTaskInstancesByProcessInstanceId(processInstanceId);
             processEngineConfiguration.getIdentityLinkServiceConfiguration().getHistoricIdentityLinkService().deleteHistoricIdentityLinksByProcessInstanceId(processInstanceId);
@@ -155,6 +164,35 @@ public class DefaultHistoryManager extends AbstractHistoryManager {
             for (String historicProcessInstanceId : historicProcessInstanceIds) {
                 // The tenantId is not important for the DefaultHistoryManager
                 recordProcessInstanceDeleted(historicProcessInstanceId, processDefinitionId, null);
+            }
+        }
+    }
+    
+    @Override
+    public void recordBulkDeleteProcessInstances(Collection<String> processInstanceIds) {
+        if (isHistoryEnabled() && processInstanceIds != null && !processInstanceIds.isEmpty()) {
+            getHistoricDetailEntityManager().bulkDeleteHistoricDetailsByProcessInstanceIds(processInstanceIds);
+            processEngineConfiguration.getVariableServiceConfiguration().getHistoricVariableService().bulkDeleteHistoricVariableInstancesByProcessInstanceIds(processInstanceIds);
+            getHistoricActivityInstanceEntityManager().bulkDeleteHistoricActivityInstancesByProcessInstanceIds(processInstanceIds);
+            TaskHelper.bulkDeleteHistoricTaskInstancesForProcessInstanceIds(processInstanceIds);
+            processEngineConfiguration.getIdentityLinkServiceConfiguration().getHistoricIdentityLinkService().bulkDeleteHistoricIdentityLinksForProcessInstanceIds(processInstanceIds);
+            
+            if (processEngineConfiguration.isEnableEntityLinks()) {
+                processEngineConfiguration.getEntityLinkServiceConfiguration().getHistoricEntityLinkService().bulkDeleteHistoricEntityLinksForScopeTypeAndScopeIds(ScopeTypes.BPMN, processInstanceIds);
+            }
+            
+            getCommentEntityManager().bulkDeleteCommentsForProcessInstanceIds(processInstanceIds);
+    
+            getHistoricProcessInstanceEntityManager().bulkDeleteHistoricProcessInstances(processInstanceIds);
+    
+            // Also delete any sub-processes that may be active (ACT-821)
+    
+            List<String> subProcessInstanceIds = getHistoricProcessInstanceEntityManager().findHistoricProcessInstanceIdsBySuperProcessInstanceIds(processInstanceIds);
+            if (subProcessInstanceIds != null && !subProcessInstanceIds.isEmpty()) {
+                List<List<String>> partitionedSubProcessInstanceIds = CollectionUtil.partition(subProcessInstanceIds, MAX_SUB_PROCESS_INSTANCES);
+                for (List<String> batchSubProcessInstanceIds : partitionedSubProcessInstanceIds) {
+                    processEngineConfiguration.getHistoryManager().recordBulkDeleteProcessInstances(batchSubProcessInstanceIds);
+                }
             }
         }
     }
@@ -200,23 +238,6 @@ public class DefaultHistoryManager extends AbstractHistoryManager {
     }
 
     @Override
-    public void recordActivityEnd(ExecutionEntity executionEntity, String deleteReason, Date endTime) {
-        if (getHistoryConfigurationSettings().isHistoryEnabledForActivity(executionEntity.getProcessDefinitionId(), executionEntity.getActivityId())) {
-            HistoricActivityInstanceEntity historicActivityInstance = findHistoricActivityInstance(executionEntity, true);
-            if (historicActivityInstance != null) {
-                historicActivityInstance.markEnded(deleteReason, endTime);
-
-                // Fire event
-                FlowableEventDispatcher eventDispatcher = getEventDispatcher();
-                if (eventDispatcher != null && eventDispatcher.isEnabled()) {
-                    eventDispatcher.dispatchEvent(FlowableEventBuilder.createEntityEvent(FlowableEngineEventType.HISTORIC_ACTIVITY_INSTANCE_ENDED, historicActivityInstance),
-                            processEngineConfiguration.getEngineCfgKey());
-                }
-            }
-        }
-    }
-
-    @Override
     public void recordProcessDefinitionChange(String processInstanceId, String processDefinitionId) {
         if (isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, processDefinitionId)) {
             HistoricProcessInstanceEntity historicProcessInstance = getHistoricProcessInstanceEntityManager().findById(processInstanceId);
@@ -250,10 +271,12 @@ public class DefaultHistoryManager extends AbstractHistoryManager {
     }
 
     @Override
-    public void recordTaskEnd(TaskEntity task, ExecutionEntity execution, String deleteReason, Date endTime) {
+    public void recordTaskEnd(TaskEntity task, ExecutionEntity execution, String userId, String deleteReason, Date endTime) {
         if (getHistoryConfigurationSettings().isHistoryEnabledForUserTask(execution, task)) {
             HistoricTaskInstanceEntity historicTaskInstance = processEngineConfiguration.getTaskServiceConfiguration().getHistoricTaskService().recordTaskEnd(task, deleteReason, endTime);
             if (historicTaskInstance != null) {
+                historicTaskInstance.setState(Task.COMPLETED);
+                historicTaskInstance.setCompletedBy(userId);
                 historicTaskInstance.setLastUpdateTime(endTime);
             }
         }
@@ -482,6 +505,7 @@ public class DefaultHistoryManager extends AbstractHistoryManager {
                 if (historicActivityInstance != null) {
                     historicActivityInstance.setTaskId(activityInstance.getTaskId());
                     historicActivityInstance.setAssignee(activityInstance.getAssignee());
+                    historicActivityInstance.setCompletedBy(activityInstance.getCompletedBy());
                     historicActivityInstance.setCalledProcessInstanceId(activityInstance.getCalledProcessInstanceId());
                 }
             }
@@ -490,7 +514,9 @@ public class DefaultHistoryManager extends AbstractHistoryManager {
     
     @Override
     public void recordHistoricUserTaskLogEntry(HistoricTaskLogEntryBuilder taskLogEntryBuilder) {
-        processEngineConfiguration.getTaskServiceConfiguration().getHistoricTaskService().createHistoricTaskLogEntry(taskLogEntryBuilder);
+        if (isHistoryEnabled(taskLogEntryBuilder.getProcessDefinitionId())) {
+            processEngineConfiguration.getTaskServiceConfiguration().getHistoricTaskService().createHistoricTaskLogEntry(taskLogEntryBuilder);
+        }
     }
 
     @Override

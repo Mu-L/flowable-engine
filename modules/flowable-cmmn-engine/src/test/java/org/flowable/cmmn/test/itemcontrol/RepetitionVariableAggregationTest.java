@@ -75,6 +75,7 @@ public class RepetitionVariableAggregationTest extends FlowableCmmnTestCase {
 
         Task task = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).taskName("My Task").singleResult();
 
+        assertThat(cmmnTaskService.getVariable(task.getId(), "repetitionCounter")).isEqualTo(1);
         Map<String, Object> variables = new HashMap<>();
         variables.put("approved", false);
         variables.put("description", "description task 0");
@@ -125,12 +126,14 @@ public class RepetitionVariableAggregationTest extends FlowableCmmnTestCase {
         }
 
         task = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).taskName("My Task").singleResult();
+        assertThat(cmmnTaskService.getVariable(task.getId(), "repetitionCounter")).isEqualTo(2);
         variables.put("approved", true);
         variables.put("description", "description task 1");
         cmmnTaskService.setAssignee(task.getId(), "userTwo");
         cmmnTaskService.complete(task.getId(), variables);
 
         task = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).taskName("My Task").singleResult();
+        assertThat(cmmnTaskService.getVariable(task.getId(), "repetitionCounter")).isEqualTo(3);
         variables.put("approved", false);
         variables.put("description", "description task 2");
         cmmnTaskService.setAssignee(task.getId(), "userThree");
@@ -166,6 +169,57 @@ public class RepetitionVariableAggregationTest extends FlowableCmmnTestCase {
                             + "]");
         }
 
+    }
+    
+    @Test
+    @CmmnDeployment
+    public void testSequentialRepeatingUserTaskIgnoreCounter() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder()
+            .caseDefinitionKey("repeatingTask")
+            .variable("nrOfLoops", 3)
+            .variable("otherVariable", "Hello World")
+            .start();
+
+        ArrayNode reviews = (ArrayNode) cmmnRuntimeService.getVariable(caseInstance.getId(), "reviews");
+
+        assertThatJson(reviews)
+                .isEqualTo("["
+                        + "{ userId: null }"
+                        + "]");
+
+        Task task = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).taskName("My Task").singleResult();
+
+        assertThat(cmmnTaskService.getVariable(task.getId(), "repetitionCounter")).isEqualTo(1); 
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("approved", false);
+        variables.put("description", "description task 0");
+        cmmnTaskService.setAssignee(task.getId(), "userOne");
+
+        reviews = (ArrayNode) cmmnRuntimeService.getVariable(caseInstance.getId(), "reviews");
+
+        assertThatJson(reviews)
+                .isEqualTo("["
+                        + "{ userId: 'userOne' }"
+                        + "]");
+
+        cmmnTaskService.complete(task.getId(), variables);
+
+        reviews = (ArrayNode) cmmnRuntimeService.getVariable(caseInstance.getId(), "reviews");
+
+        assertThatJson(reviews)
+                .isEqualTo("["
+                        + "{ userId: 'userOne', approved : false, description : 'description task 0' },"
+                        + "{ userId: null }"
+                        + "]");
+
+        assertVariablesNotVisible(caseInstance);
+        
+        task = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).taskName("My Task").singleResult();
+        assertThat(cmmnTaskService.getVariable(task.getId(), "repetitionCounter")).isEqualTo(2);
+        variables.put("approved", true);
+        variables.put("description", "description task 1");
+        cmmnTaskService.setAssignee(task.getId(), "userTwo");
+        cmmnTaskService.complete(task.getId(), variables);
     }
 
     @Test
@@ -315,6 +369,92 @@ public class RepetitionVariableAggregationTest extends FlowableCmmnTestCase {
             assertThat(historicFirstDescription.getValue()).isEqualTo("description task 0");
         }
 
+    }
+
+    @Test
+    @CmmnDeployment(resources = {
+            "org/flowable/cmmn/test/itemcontrol/RepetitionVariableAggregationTest.testSequentialRepeatingCaseTask.cmmn",
+            "org/flowable/cmmn/test/runtime/oneHumanTaskCase.cmmn",
+    })
+    public void testSequentialRepeatingCaseTask() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder()
+                .caseDefinitionKey("repeatingTask")
+                .variable("nrOfLoops", 3)
+                .variable("otherVariable", "Hello World")
+                .start();
+
+        VariableInstance reviews = cmmnRuntimeService.getVariableInstance(caseInstance.getId(), "reviews");
+
+        assertThat(reviews).isNull();
+
+        Task task = cmmnTaskService.createTaskQuery().taskName("Sub task").singleResult();
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("approved", false);
+        variables.put("description", "description task 0");
+
+        reviews = cmmnRuntimeService.getVariableInstance(caseInstance.getId(), "reviews");
+        assertThat(reviews).isNull();
+
+        if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.AUDIT, cmmnEngineConfiguration)) {
+            HistoricVariableInstance historicReviews = cmmnHistoryService.createHistoricVariableInstanceQuery()
+                    .variableName("reviews")
+                    .singleResult();
+            assertThat(historicReviews).isNull();
+        }
+
+        cmmnTaskService.complete(task.getId(), variables);
+
+        reviews = cmmnRuntimeService.getVariableInstance(caseInstance.getId(), "reviews");
+        assertThat(reviews).isNull();
+
+        assertVariablesNotVisible(caseInstance);
+
+        if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.AUDIT, cmmnEngineConfiguration)) {
+            HistoricVariableInstance historicReviews = cmmnHistoryService.createHistoricVariableInstanceQuery()
+                    .variableName("reviews")
+                    .singleResult();
+            assertThat(historicReviews).isNull();
+        }
+
+        task = cmmnTaskService.createTaskQuery().taskName("Sub task").singleResult();
+        variables.put("approved", true);
+        variables.put("description", "description task 1");
+        cmmnTaskService.complete(task.getId(), variables);
+
+        task = cmmnTaskService.createTaskQuery().taskName("Sub task").singleResult();
+        variables.put("approved", false);
+        variables.put("description", "description task 2");
+        cmmnTaskService.complete(task.getId(), variables);
+
+        assertVariablesNotVisible(caseInstance);
+
+        reviews = cmmnRuntimeService.getVariableInstance(caseInstance.getId(), "reviews");
+
+        assertThat(reviews).isNotNull();
+        assertThat(reviews.getTypeName()).isEqualTo(JsonType.TYPE_NAME);
+        assertThatJson(reviews.getValue())
+                .isEqualTo("["
+                        + "{ approved: false, description: 'description task 0' },"
+                        + "{ approved: true, description: 'description task 1' },"
+                        + "{ approved: false, description: 'description task 2' }"
+                        + "]");
+
+        assertNoAggregatedVariables();
+
+        if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.AUDIT, cmmnEngineConfiguration)) {
+            HistoricVariableInstance historicReviews = cmmnHistoryService.createHistoricVariableInstanceQuery()
+                    .variableName("reviews")
+                    .singleResult();
+            assertThat(historicReviews).isNotNull();
+            assertThat(historicReviews.getVariableTypeName()).isEqualTo(JsonType.TYPE_NAME);
+            assertThatJson(historicReviews.getValue())
+                    .isEqualTo("["
+                            + "{ approved: false, description: 'description task 0' },"
+                            + "{ approved: true, description: 'description task 1' },"
+                            + "{ approved: false, description: 'description task 2' }"
+                            + "]");
+        }
     }
 
     @Test

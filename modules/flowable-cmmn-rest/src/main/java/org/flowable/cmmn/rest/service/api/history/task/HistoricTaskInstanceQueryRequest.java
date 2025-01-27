@@ -36,15 +36,20 @@ public class HistoricTaskInstanceQueryRequest extends PaginateRequest {
     protected String caseDefinitionKeyLike;
     protected String caseDefinitionKeyLikeIgnoreCase;
     protected Collection<String> caseDefinitionKeys;
+    protected String planItemInstanceId;
     protected String propagatedStageInstanceId;
     protected Boolean withoutScopeId;
     protected String taskName;
     protected String taskNameLike;
+    protected String taskNameLikeIgnoreCase;
     protected String taskDescription;
     protected String taskDescriptionLike;
     protected String taskDefinitionKey;
     protected String taskDefinitionKeyLike;
     protected String taskCategory;
+    protected List<String> taskCategoryIn;
+    protected List<String> taskCategoryNotIn;
+    protected Boolean taskWithoutCategory;
     protected String taskDeleteReason;
     protected String taskDeleteReasonLike;
     protected String taskAssignee;
@@ -77,6 +82,8 @@ public class HistoricTaskInstanceQueryRequest extends PaginateRequest {
     protected Boolean withoutProcessInstanceId;
     protected String taskCandidateGroup;
     protected boolean ignoreTaskAssignee;
+    protected String rootScopeId;
+    protected String parentScopeId;
 
     public String getTaskId() {
         return taskId;
@@ -174,6 +181,14 @@ public class HistoricTaskInstanceQueryRequest extends PaginateRequest {
         this.taskNameLike = taskNameLike;
     }
 
+    public String getTaskNameLikeIgnoreCase() {
+        return taskNameLikeIgnoreCase;
+    }
+
+    public void setTaskNameLikeIgnoreCase(String taskNameLikeIgnoreCase) {
+        this.taskNameLikeIgnoreCase = taskNameLikeIgnoreCase;
+    }
+
     public String getTaskDescription() {
         return taskDescription;
     }
@@ -212,6 +227,30 @@ public class HistoricTaskInstanceQueryRequest extends PaginateRequest {
 
     public void setTaskCategory(String taskCategory) {
         this.taskCategory = taskCategory;
+    }
+
+    public void setTaskCategoryIn(List<String> taskCategoryIn) {
+        this.taskCategoryIn = taskCategoryIn;
+    }
+
+    public List<String> getTaskCategoryIn() {
+        return taskCategoryIn;
+    }
+
+    public void setTaskCategoryNotIn(List<String> taskCategoryNotIn) {
+        this.taskCategoryNotIn = taskCategoryNotIn;
+    }
+
+    public List<String> getTaskCategoryNotIn() {
+        return taskCategoryNotIn;
+    }
+
+    public void setTaskWithoutCategory(Boolean taskWithoutCategory) {
+        this.taskWithoutCategory = taskWithoutCategory;
+    }
+
+    public Boolean getTaskWithoutCategory() {
+        return taskWithoutCategory;
     }
 
     public String getTaskDeleteReason() {
@@ -471,4 +510,27 @@ public class HistoricTaskInstanceQueryRequest extends PaginateRequest {
         this.ignoreTaskAssignee = ignoreTaskAssignee;
     }
 
+    public String getPlanItemInstanceId() {
+        return planItemInstanceId;
+    }
+
+    public void setPlanItemInstanceId(String planItemInstanceId) {
+        this.planItemInstanceId = planItemInstanceId;
+    }
+
+    public String getRootScopeId() {
+        return rootScopeId;
+    }
+
+    public void setRootScopeId(String rootScopeId) {
+        this.rootScopeId = rootScopeId;
+    }
+
+    public String getParentScopeId() {
+        return parentScopeId;
+    }
+
+    public void setParentScopeId(String parentScopeId) {
+        this.parentScopeId = parentScopeId;
+    }
 }

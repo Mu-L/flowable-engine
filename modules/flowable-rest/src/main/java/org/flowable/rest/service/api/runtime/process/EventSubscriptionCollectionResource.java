@@ -17,8 +17,6 @@ import static org.flowable.common.rest.api.PaginateListUtil.paginateList;
 
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.flowable.common.rest.api.DataResponse;
 import org.flowable.common.rest.api.RequestUtil;
 import org.flowable.engine.RuntimeService;
@@ -84,7 +82,7 @@ public class EventSubscriptionCollectionResource {
             @ApiResponse(code = 400, message = "Indicates an illegal value has been used in a url query parameter. Status description contains additional details about the error.")
     })
     @GetMapping(value = "/runtime/event-subscriptions", produces = "application/json")
-    public DataResponse<EventSubscriptionResponse> getEventSubscriptions(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<EventSubscriptionResponse> getEventSubscriptions(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         EventSubscriptionQuery query = runtimeService.createEventSubscriptionQuery();
 
         if (allRequestParams.containsKey("id")) {
@@ -105,19 +103,19 @@ public class EventSubscriptionCollectionResource {
         if (allRequestParams.containsKey("processInstanceId")) {
             query.processInstanceId(allRequestParams.get("processInstanceId"));
         }
-        if (allRequestParams.containsKey("withoutProcessInstanceId") && Boolean.valueOf(allRequestParams.get("withoutProcessInstanceId"))) {
+        if (allRequestParams.containsKey("withoutProcessInstanceId") && Boolean.parseBoolean(allRequestParams.get("withoutProcessInstanceId"))) {
             query.withoutProcessInstanceId();
         }
         if (allRequestParams.containsKey("processDefinitionId")) {
             query.processDefinitionId(allRequestParams.get("processDefinitionId"));
         }
-        if (allRequestParams.containsKey("withoutProcessDefinitionId") && Boolean.valueOf(allRequestParams.get("withoutProcessDefinitionId"))) {
+        if (allRequestParams.containsKey("withoutProcessDefinitionId") && Boolean.parseBoolean(allRequestParams.get("withoutProcessDefinitionId"))) {
             query.withoutProcessDefinitionId();
         }
         if (allRequestParams.containsKey("scopeId")) {
             query.scopeId(allRequestParams.get("scopeId"));
         }
-        if (allRequestParams.containsKey("withoutScopeId") && Boolean.valueOf(allRequestParams.get("withoutScopeId"))) {
+        if (allRequestParams.containsKey("withoutScopeId") && Boolean.parseBoolean(allRequestParams.get("withoutScopeId"))) {
             query.withoutScopeId();
         }
         if (allRequestParams.containsKey("subScopeId")) {
@@ -126,7 +124,7 @@ public class EventSubscriptionCollectionResource {
         if (allRequestParams.containsKey("scopeDefinitionId")) {
             query.scopeDefinitionId(allRequestParams.get("scopeDefinitionId"));
         }
-        if (allRequestParams.containsKey("withoutScopeDefinitionId") && Boolean.valueOf(allRequestParams.get("withoutScopeDefinitionId"))) {
+        if (allRequestParams.containsKey("withoutScopeDefinitionId") && Boolean.parseBoolean(allRequestParams.get("withoutScopeDefinitionId"))) {
             query.withoutScopeDefinitionId();
         }
         if (allRequestParams.containsKey("createdBefore")) {
@@ -138,13 +136,13 @@ public class EventSubscriptionCollectionResource {
         if (allRequestParams.containsKey("tenantId")) {
             query.tenantId(allRequestParams.get("tenantId"));
         }
-        if (allRequestParams.containsKey("withoutTenantId") && Boolean.valueOf(allRequestParams.get("withoutTenantId"))) {
+        if (allRequestParams.containsKey("withoutTenantId") && Boolean.parseBoolean(allRequestParams.get("withoutTenantId"))) {
             query.withoutTenantId();
         }
         if (allRequestParams.containsKey("configuration")) {
             query.configuration(allRequestParams.get("configuration"));
         }
-        if (allRequestParams.containsKey("withoutConfiguration") && Boolean.valueOf(allRequestParams.get("withoutConfiguration"))) {
+        if (allRequestParams.containsKey("withoutConfiguration") && Boolean.parseBoolean(allRequestParams.get("withoutConfiguration"))) {
             query.withoutConfiguration();
         }
         

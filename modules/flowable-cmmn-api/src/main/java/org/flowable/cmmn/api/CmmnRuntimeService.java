@@ -18,6 +18,9 @@ import java.util.Map;
 
 import org.flowable.cmmn.api.runtime.CaseInstanceBuilder;
 import org.flowable.cmmn.api.runtime.CaseInstanceQuery;
+import org.flowable.cmmn.api.runtime.CaseInstanceStartEventSubscriptionBuilder;
+import org.flowable.cmmn.api.runtime.CaseInstanceStartEventSubscriptionDeletionBuilder;
+import org.flowable.cmmn.api.runtime.CaseInstanceStartEventSubscriptionModificationBuilder;
 import org.flowable.cmmn.api.runtime.ChangePlanItemStateBuilder;
 import org.flowable.cmmn.api.runtime.GenericEventListenerInstanceQuery;
 import org.flowable.cmmn.api.runtime.MilestoneInstanceQuery;
@@ -88,6 +91,16 @@ public interface CmmnRuntimeService {
      *     when no case instance is found for the given caseInstanceId.
      */
     Map<String, Object> getVariables(String caseInstanceId);
+
+    /**
+     * The variable values for all given variableNames.
+     *
+     * @param caseInstanceId id of execution, cannot be null.
+     * @param variableNames the collection of variable names that should be retrieved.
+     * @return the variables or an empty map if no such variables are found.
+     * @throws FlowableObjectNotFoundException when no case instance is found for the given caseInstanceId.
+     */
+    Map<String, Object> getVariables(String caseInstanceId, Collection<String> variableNames);
     
     /**
      * All variables visible from the given case instance scope.
@@ -111,6 +124,17 @@ public interface CmmnRuntimeService {
      */
     Map<String, Object> getLocalVariables(String planItemInstanceId);
     
+    /**
+     * All variable values for all given variableNames that are defined in the plan item instance scope,
+     * without taking outer scopes into account.
+     *
+     * @param planItemInstanceId id of plan item instance, cannot be null.
+     * @param variableNames the collection of variable names that should be retrieved.
+     * @return the variables or an empty map if no such variables are found.
+     * @throws FlowableObjectNotFoundException when no plan item instance is found for the given planItemInstanceId.
+     */
+    Map<String, Object> getLocalVariables(String planItemInstanceId, Collection<String> variableNames);
+
     /**
      * All variable values that are defined in the plan item instance scope, without taking outer scopes into account.
      *
@@ -179,6 +203,11 @@ public interface CmmnRuntimeService {
      */
     boolean hasVariable(String caseInstanceId, String variableName);
     
+    /**
+     * Check whether or not this plan item instance has local variable set with the given name.
+     */
+    boolean hasLocalVariable(String planItemInstanceId, String variableName);
+
     void setVariables(String caseInstanceId, Map<String, Object> variables);
     
     void setVariable(String caseInstanceId, String variableName, Object variableValue);
@@ -186,6 +215,14 @@ public interface CmmnRuntimeService {
     void setLocalVariables(String planItemInstanceId, Map<String, Object> variables);
     
     void setLocalVariable(String planItemInstanceId, String variableName, Object variableValue);
+    
+    void setVariablesAsync(String caseInstanceId, Map<String, Object> variables);
+    
+    void setVariableAsync(String caseInstanceId, String variableName, Object variableValue);
+    
+    void setLocalVariablesAsync(String planItemInstanceId, Map<String, Object> variables);
+    
+    void setLocalVariableAsync(String planItemInstanceId, String variableName, Object variableValue);
     
     void removeVariable(String caseInstanceId, String variableName);
     
@@ -232,6 +269,36 @@ public interface CmmnRuntimeService {
      *             when the case instance doesn't exist.
      */
     List<StageResponse> getStageOverview(String caseInstanceId);
+
+    /**
+     * Set the new owner of a case instance.
+     *
+     * @param caseInstanceId the id of the case to set its new owner
+     * @param userId the id of the user to set as the new owner
+     */
+    void setOwner(String caseInstanceId, String userId);
+
+    /**
+     * Removes the owner of a case instance.
+     *
+     * @param caseInstanceId the id of the case to remove the owner from
+     */
+    void removeOwner(String caseInstanceId);
+
+    /**
+     * Set the new assignee of a case instance.
+     *
+     * @param caseInstanceId the id of the case to set its new assignee
+     * @param userId the id of the user to set as the new assignee
+     */
+    void setAssignee(String caseInstanceId, String userId);
+
+    /**
+     * Removes the assignee of a case instance.
+     *
+     * @param caseInstanceId the id of the case to remove the assignee from
+     */
+    void removeAssignee(String caseInstanceId);
     
     /**
      * Involves a user with a case instance. The type of identity link is defined by the given identityLinkType.
@@ -257,12 +324,12 @@ public interface CmmnRuntimeService {
      * @param identityLinkType
      *            type of identity, cannot be null.
      * @throws FlowableObjectNotFoundException
-     *             when the process instance or group doesn't exist.
+     *             when the case instance or group doesn't exist.
      */
     void addGroupIdentityLink(String caseInstanceId, String groupId, String identityLinkType);
 
     /**
-     * Removes the association between a user and a process instance for the given identityLinkType.
+     * Removes the association between a user and a case instance for the given identityLinkType.
      * 
      * @param caseInstanceId
      *            id of the case instance, cannot be null.
@@ -276,7 +343,7 @@ public interface CmmnRuntimeService {
     void deleteUserIdentityLink(String caseInstanceId, String userId, String identityLinkType);
 
     /**
-     * Removes the association between a group and a process instance for the given identityLinkType.
+     * Removes the association between a group and a case instance for the given identityLinkType.
      * 
      * @param caseInstanceId
      *            id of the case instance, cannot be null.
@@ -325,7 +392,7 @@ public interface CmmnRuntimeService {
     FormInfo getStartFormModel(String caseDefinitionId, String caseInstanceId);
     
     /**
-     * Create a {@link ChangePlanItemStateBuilder}, that allows to set various options for changing the state of a process instance.
+     * Create a {@link ChangePlanItemStateBuilder}, that allows to set various options for changing the state of a case instance.
      */
     ChangePlanItemStateBuilder createChangePlanItemStateBuilder();
 
@@ -386,4 +453,32 @@ public interface CmmnRuntimeService {
      *     when the given event is not suitable for dispatching.
      */
     void dispatchEvent(FlowableEvent event);
+    
+    /**
+     * Creates a new event subscription builder to register a subscription to start a new case instance based on an event with a particular set of
+     * correlation parameter values. In order for this to work, the case definition needs to have an event-registry based start event with a
+     * dynamic, manual subscription based behavior and the registered correlation parameter values within the builder need to be based on
+     * actual correlation parameter definitions within the event model the start event is based on.
+     * Register one or more correlation parameter value with in the builder before invoking the
+     * {@link CaseInstanceStartEventSubscriptionBuilder#subscribe()} method to create and register the subscription.
+     *
+     * @return the subscription builder
+     */
+    CaseInstanceStartEventSubscriptionBuilder createCaseInstanceStartEventSubscriptionBuilder();
+
+    /**
+     * Creates a new event subscription modification builder to modify one or more previously registered case start event subscriptions based
+     * on a particular case definition and with an optional combination of correlation parameter values.
+     *
+     * @return the subscription modification builder
+     */
+    CaseInstanceStartEventSubscriptionModificationBuilder createCaseInstanceStartEventSubscriptionModificationBuilder();
+
+    /**
+     * Creates a new event subscription deletion builder to delete one or more previously registered case start event subscriptions based
+     * on a particular case definition and with an optional combination of correlation parameter values.
+     *
+     * @return the subscription deletion builder
+     */
+    CaseInstanceStartEventSubscriptionDeletionBuilder createCaseInstanceStartEventSubscriptionDeletionBuilder();
 }

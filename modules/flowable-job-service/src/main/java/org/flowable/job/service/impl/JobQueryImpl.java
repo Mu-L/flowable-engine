@@ -46,6 +46,7 @@ public class JobQueryImpl extends AbstractQuery<JobQuery, Job> implements JobQue
     protected String handlerType;
     protected Collection<String> handlerTypes;
     protected String processDefinitionId;
+    protected String processDefinitionKey;
     protected String category;
     protected String categoryLike;
     protected String elementId;
@@ -55,6 +56,7 @@ public class JobQueryImpl extends AbstractQuery<JobQuery, Job> implements JobQue
     protected String subScopeId;
     protected String scopeType;
     protected String scopeDefinitionId;
+    protected String caseDefinitionKey;
     protected String correlationId;
     protected boolean onlyTimers;
     protected boolean onlyMessages;
@@ -125,6 +127,15 @@ public class JobQueryImpl extends AbstractQuery<JobQuery, Job> implements JobQue
             throw new FlowableIllegalArgumentException("Provided process definition id is null");
         }
         this.processDefinitionId = processDefinitionId;
+        return this;
+    }
+
+    @Override
+    public JobQueryImpl processDefinitionKey(String processDefinitionKey) {
+        if (processDefinitionKey == null) {
+            throw new FlowableIllegalArgumentException("Provided process definition key is null");
+        }
+        this.processDefinitionKey = processDefinitionKey;
         return this;
     }
 
@@ -223,6 +234,15 @@ public class JobQueryImpl extends AbstractQuery<JobQuery, Job> implements JobQue
         }
         scopeDefinitionId(caseDefinitionId);
         scopeType(ScopeTypes.CMMN);
+        return this;
+    }
+
+    @Override
+    public JobQueryImpl caseDefinitionKey(String caseDefinitionKey) {
+        if (caseDefinitionKey == null) {
+            throw new FlowableIllegalArgumentException("Provided case definition id is null");
+        }
+        this.caseDefinitionKey = caseDefinitionKey;
         return this;
     }
 
@@ -438,6 +458,10 @@ public class JobQueryImpl extends AbstractQuery<JobQuery, Job> implements JobQue
         return this.handlerType;
     }
 
+    public Collection<String> getHandlerTypes() {
+	return this.handlerTypes;
+    }
+
     public Date getNow() {
         return jobServiceConfiguration.getClock().getCurrentTime();
     }
@@ -468,6 +492,10 @@ public class JobQueryImpl extends AbstractQuery<JobQuery, Job> implements JobQue
 
     public String getProcessDefinitionId() {
         return processDefinitionId;
+    }
+
+    public String getProcessDefinitionKey() {
+        return processDefinitionKey;
     }
 
     public String getCategory() {
@@ -504,6 +532,10 @@ public class JobQueryImpl extends AbstractQuery<JobQuery, Job> implements JobQue
 
     public String getScopeDefinitionId() {
         return scopeDefinitionId;
+    }
+
+    public String getCaseDefinitionKey() {
+        return caseDefinitionKey;
     }
 
     public String getCorrelationId() {

@@ -13,11 +13,17 @@
 package org.flowable.cmmn.test.eventlistener;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.List;
 
 import org.assertj.core.groups.Tuple;
@@ -33,6 +39,7 @@ import org.flowable.cmmn.engine.test.impl.CmmnJobTestHelper;
 import org.flowable.cmmn.model.HumanTask;
 import org.flowable.cmmn.model.Stage;
 import org.flowable.cmmn.model.TimerEventListener;
+import org.flowable.common.engine.api.FlowableObjectNotFoundException;
 import org.flowable.common.engine.api.scope.ScopeTypes;
 import org.flowable.common.engine.impl.history.HistoryLevel;
 import org.flowable.job.api.Job;
@@ -740,4 +747,188 @@ public class TimerEventListenerTest extends FlowableCmmnTestCase {
         assertThat(cmmnManagementService.createTimerJobQuery().caseInstanceId(caseInstance.getId()).count()).isEqualTo(0);
     }
 
+    @Test
+    @CmmnDeployment
+    public void testDateTypes() throws ParseException {
+        Date date = new SimpleDateFormat("dd-MM-yyyy hh:mm:ss XXX").parse("30-01-2024 10:28:00 +01:00");
+        Instant instant = date.toInstant();
+        LocalDate localDate = LocalDate.of(2024, 1, 30);
+        LocalDateTime localDateTime = LocalDateTime.of(2024, 1, 30, 10, 22);
+
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder()
+                .caseDefinitionKey("testTimerEventDateTypes")
+                .variable("taskDate", date)
+                .variable("taskInstant", instant)
+                .variable("taskLocalDate", localDate)
+                .variable("taskLocalDateTime", localDateTime)
+                .variable("taskDateString", "2024-01-30T10:28:00+01:00")
+                .start();
+
+        // The case model has 5 timer event listeners, each with a user task afer it.
+        // The fact that the user task exists, means that the date variable was able to be parsed.
+
+        cmmnManagementService.createTimerJobQuery().caseInstanceId(caseInstance.getId()).list()
+                .forEach(t -> cmmnManagementService.moveTimerToExecutableJob(t.getId()));
+        cmmnManagementService.createJobQuery().list().forEach(j -> cmmnManagementService.executeJob(j.getId()));
+
+        List<Task> tasks = cmmnTaskService.createTaskQuery().caseInstanceId(caseInstance.getId()).list();
+        assertThat(tasks).extracting(Task::getName).containsExactlyInAnyOrder(
+                "dateTask", "instantTask", "localDateTask", "localDateTimeTask", "dateStringTask"
+        );
+    }
+
+    @Test
+    @CmmnDeployment
+    public void testTimerRescheduleWithDate() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder().caseDefinitionKey("testTimerExpression").start();
+        assertThat(cmmnRuntimeService.createPlanItemInstanceQuery().planItemDefinitionType(PlanItemDefinitionType.TIMER_EVENT_LISTENER)
+                .planItemInstanceStateAvailable().singleResult()).isNotNull();
+        assertThat(cmmnManagementService.createTimerJobQuery().count()).isEqualTo(1);
+        assertThat(cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).scopeType(ScopeTypes.CMMN).count()).isEqualTo(1);
+
+        Job timerJob = cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).singleResult();
+        
+        Calendar newDueDateCal = new GregorianCalendar();
+        newDueDateCal.add(Calendar.DATE, 20);
+        Job newTimerJob = cmmnManagementService.rescheduleTimeDateJob(timerJob.getId(), newDueDateCal.getTime());
+        
+        Calendar compareCal = new GregorianCalendar();
+        compareCal.add(Calendar.DATE, 19);
+        
+        assertThat(newTimerJob.getId()).isNotEqualTo(timerJob.getId());
+        assertThat(newTimerJob.getDuedate()).isAfter(compareCal.getTime());
+        
+        Job dbTimerJob = cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).singleResult();
+        assertThat(dbTimerJob.getId()).isEqualTo(newTimerJob.getId());
+        assertThat(dbTimerJob.getDuedate()).isAfter(compareCal.getTime());
+        
+        if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, cmmnEngineConfiguration)) {
+            assertThat(cmmnHistoryService.createHistoricPlanItemInstanceQuery().list())
+                    .extracting(HistoricPlanItemInstance::getPlanItemDefinitionType, HistoricPlanItemInstance::getPlanItemDefinitionId, HistoricPlanItemInstance::getState)
+                    .containsExactlyInAnyOrder(
+                            tuple(PlanItemDefinitionType.TIMER_EVENT_LISTENER, "timerListener", PlanItemInstanceState.AVAILABLE),
+                            tuple(PlanItemDefinitionType.HUMAN_TASK, "taskA", PlanItemInstanceState.AVAILABLE)
+                    );
+        }
+    }
+    
+    @Test
+    @CmmnDeployment(resources = "org/flowable/cmmn/test/eventlistener/TimerEventListenerTest.testTimerRescheduleWithDate.cmmn")
+    public void testWrongTimerRescheduleWithDate() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder().caseDefinitionKey("testTimerExpression").start();
+        assertThat(cmmnRuntimeService.createPlanItemInstanceQuery().planItemDefinitionType(PlanItemDefinitionType.TIMER_EVENT_LISTENER)
+                .planItemInstanceStateAvailable().singleResult()).isNotNull();
+        assertThat(cmmnManagementService.createTimerJobQuery().count()).isEqualTo(1);
+        assertThat(cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).scopeType(ScopeTypes.CMMN).count()).isEqualTo(1);
+
+        Calendar newDueDateCal = new GregorianCalendar();
+        newDueDateCal.add(Calendar.DATE, 20);
+        assertThatThrownBy(() -> {
+            cmmnManagementService.rescheduleTimeDateJob("wrongid", newDueDateCal.getTime());
+        }).isInstanceOf(FlowableObjectNotFoundException.class)
+            .hasMessageContaining("Timer job not found for id wrongid");
+    }
+    
+    @Test
+    @CmmnDeployment(resources = "org/flowable/cmmn/test/eventlistener/TimerEventListenerTest.testTimerRescheduleWithDate.cmmn")
+    public void testTimerRescheduleWithDateValue() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder().caseDefinitionKey("testTimerExpression").start();
+        assertThat(cmmnRuntimeService.createPlanItemInstanceQuery().planItemDefinitionType(PlanItemDefinitionType.TIMER_EVENT_LISTENER)
+                .planItemInstanceStateAvailable().singleResult()).isNotNull();
+        assertThat(cmmnManagementService.createTimerJobQuery().count()).isEqualTo(1);
+        assertThat(cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).scopeType(ScopeTypes.CMMN).count()).isEqualTo(1);
+
+        Job timerJob = cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).singleResult();
+        
+        Job newTimerJob = cmmnManagementService.rescheduleTimeDateValueJob(timerJob.getId(), "P20D");
+        
+        Calendar compareCal = new GregorianCalendar();
+        compareCal.add(Calendar.DATE, 19);
+        
+        assertThat(newTimerJob.getId()).isNotEqualTo(timerJob.getId());
+        assertThat(newTimerJob.getDuedate()).isAfter(compareCal.getTime());
+        
+        Job dbTimerJob = cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).singleResult();
+        assertThat(dbTimerJob.getId()).isEqualTo(newTimerJob.getId());
+        assertThat(dbTimerJob.getDuedate()).isAfter(compareCal.getTime());
+        
+        if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, cmmnEngineConfiguration)) {
+            assertThat(cmmnHistoryService.createHistoricPlanItemInstanceQuery().list())
+                    .extracting(HistoricPlanItemInstance::getPlanItemDefinitionType, HistoricPlanItemInstance::getPlanItemDefinitionId, HistoricPlanItemInstance::getState)
+                    .containsExactlyInAnyOrder(
+                            tuple(PlanItemDefinitionType.TIMER_EVENT_LISTENER, "timerListener", PlanItemInstanceState.AVAILABLE),
+                            tuple(PlanItemDefinitionType.HUMAN_TASK, "taskA", PlanItemInstanceState.AVAILABLE)
+                    );
+        }
+    }
+    
+    @Test
+    @CmmnDeployment(resources = "org/flowable/cmmn/test/eventlistener/TimerEventListenerTest.testTimerRescheduleWithDate.cmmn")
+    public void testTimerEventListenerInstanceRescheduleWithDate() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder().caseDefinitionKey("testTimerExpression").start();
+        assertThat(cmmnRuntimeService.createPlanItemInstanceQuery().planItemDefinitionType(PlanItemDefinitionType.TIMER_EVENT_LISTENER)
+                .planItemInstanceStateAvailable().singleResult()).isNotNull();
+        assertThat(cmmnManagementService.createTimerJobQuery().count()).isEqualTo(1);
+        assertThat(cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).scopeType(ScopeTypes.CMMN).count()).isEqualTo(1);
+
+        Job timerJob = cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).singleResult();
+        
+        Calendar newDueDateCal = new GregorianCalendar();
+        newDueDateCal.add(Calendar.DATE, 20);
+        PlanItemInstance planItemInstance = cmmnRuntimeService.createPlanItemInstanceQuery().planItemDefinitionType(PlanItemDefinitionType.TIMER_EVENT_LISTENER).caseInstanceId(caseInstance.getId()).singleResult();
+        Job newTimerJob = cmmnManagementService.rescheduleTimerEventListenerInstanceWithDate(planItemInstance.getId(), newDueDateCal.getTime());
+        
+        Calendar compareCal = new GregorianCalendar();
+        compareCal.add(Calendar.DATE, 19);
+        
+        assertThat(newTimerJob.getId()).isNotEqualTo(timerJob.getId());
+        assertThat(newTimerJob.getDuedate()).isAfter(compareCal.getTime());
+        
+        Job dbTimerJob = cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).singleResult();
+        assertThat(dbTimerJob.getId()).isEqualTo(newTimerJob.getId());
+        assertThat(dbTimerJob.getDuedate()).isAfter(compareCal.getTime());
+        
+        if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, cmmnEngineConfiguration)) {
+            assertThat(cmmnHistoryService.createHistoricPlanItemInstanceQuery().list())
+                    .extracting(HistoricPlanItemInstance::getPlanItemDefinitionType, HistoricPlanItemInstance::getPlanItemDefinitionId, HistoricPlanItemInstance::getState)
+                    .containsExactlyInAnyOrder(
+                            tuple(PlanItemDefinitionType.TIMER_EVENT_LISTENER, "timerListener", PlanItemInstanceState.AVAILABLE),
+                            tuple(PlanItemDefinitionType.HUMAN_TASK, "taskA", PlanItemInstanceState.AVAILABLE)
+                    );
+        }
+    }
+    
+    @Test
+    @CmmnDeployment(resources = "org/flowable/cmmn/test/eventlistener/TimerEventListenerTest.testTimerRescheduleWithDate.cmmn")
+    public void testTimerEventListenerInstanceRescheduleWithDateValue() {
+        CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder().caseDefinitionKey("testTimerExpression").start();
+        assertThat(cmmnRuntimeService.createPlanItemInstanceQuery().planItemDefinitionType(PlanItemDefinitionType.TIMER_EVENT_LISTENER)
+                .planItemInstanceStateAvailable().singleResult()).isNotNull();
+        assertThat(cmmnManagementService.createTimerJobQuery().count()).isEqualTo(1);
+        assertThat(cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).scopeType(ScopeTypes.CMMN).count()).isEqualTo(1);
+
+        Job timerJob = cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).singleResult();
+        
+        PlanItemInstance planItemInstance = cmmnRuntimeService.createPlanItemInstanceQuery().planItemDefinitionType(PlanItemDefinitionType.TIMER_EVENT_LISTENER).caseInstanceId(caseInstance.getId()).singleResult();
+        Job newTimerJob = cmmnManagementService.rescheduleTimerEventListenerInstanceWithDateValue(planItemInstance.getId(), "P20D");
+        
+        Calendar compareCal = new GregorianCalendar();
+        compareCal.add(Calendar.DATE, 19);
+        
+        assertThat(newTimerJob.getId()).isNotEqualTo(timerJob.getId());
+        assertThat(newTimerJob.getDuedate()).isAfter(compareCal.getTime());
+        
+        Job dbTimerJob = cmmnManagementService.createTimerJobQuery().scopeId(caseInstance.getId()).singleResult();
+        assertThat(dbTimerJob.getId()).isEqualTo(newTimerJob.getId());
+        assertThat(dbTimerJob.getDuedate()).isAfter(compareCal.getTime());
+        
+        if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, cmmnEngineConfiguration)) {
+            assertThat(cmmnHistoryService.createHistoricPlanItemInstanceQuery().list())
+                    .extracting(HistoricPlanItemInstance::getPlanItemDefinitionType, HistoricPlanItemInstance::getPlanItemDefinitionId, HistoricPlanItemInstance::getState)
+                    .containsExactlyInAnyOrder(
+                            tuple(PlanItemDefinitionType.TIMER_EVENT_LISTENER, "timerListener", PlanItemInstanceState.AVAILABLE),
+                            tuple(PlanItemDefinitionType.HUMAN_TASK, "taskA", PlanItemInstanceState.AVAILABLE)
+                    );
+        }
+    }
 }

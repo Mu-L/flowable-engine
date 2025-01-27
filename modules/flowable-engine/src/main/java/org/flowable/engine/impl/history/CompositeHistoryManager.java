@@ -121,6 +121,13 @@ public class CompositeHistoryManager implements HistoryManager {
     }
 
     @Override
+    public void recordBulkDeleteProcessInstances(Collection<String> processInstanceIds) {
+        for (HistoryManager historyManager : historyManagers) {
+            historyManager.recordBulkDeleteProcessInstances(processInstanceIds);
+        }
+    }
+
+    @Override
     public void recordActivityStart(ActivityInstance activityInstance) {
         for (HistoryManager historyManager : historyManagers) {
             historyManager.recordActivityStart(activityInstance);
@@ -131,13 +138,6 @@ public class CompositeHistoryManager implements HistoryManager {
     public void recordActivityEnd(ActivityInstance activityInstance) {
         for (HistoryManager historyManager : historyManagers) {
             historyManager.recordActivityEnd(activityInstance);
-        }
-    }
-
-    @Override
-    public void recordActivityEnd(ExecutionEntity executionEntity, String deleteReason, Date endTime) {
-        for (HistoryManager historyManager : historyManagers) {
-            historyManager.recordActivityEnd(executionEntity, deleteReason, endTime);
         }
     }
 
@@ -168,9 +168,9 @@ public class CompositeHistoryManager implements HistoryManager {
     }
 
     @Override
-    public void recordTaskEnd(TaskEntity task, ExecutionEntity execution, String deleteReason, Date endTime) {
+    public void recordTaskEnd(TaskEntity task, ExecutionEntity execution, String userId, String deleteReason, Date endTime) {
         for (HistoryManager historyManager : historyManagers) {
-            historyManager.recordTaskEnd(task, execution, deleteReason, endTime);
+            historyManager.recordTaskEnd(task, execution, userId, deleteReason, endTime);
         }
     }
 

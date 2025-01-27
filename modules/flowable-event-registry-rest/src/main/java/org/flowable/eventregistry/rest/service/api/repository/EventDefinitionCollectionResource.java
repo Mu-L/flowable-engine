@@ -18,8 +18,6 @@ import static org.flowable.common.rest.api.PaginateListUtil.paginateList;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.flowable.common.engine.api.query.QueryProperty;
 import org.flowable.common.rest.api.DataResponse;
 import org.flowable.eventregistry.api.EventDefinitionQuery;
@@ -92,7 +90,7 @@ public class EventDefinitionCollectionResource {
             @ApiResponse(code = 400, message = "Indicates a parameter was passed in the wrong format or that latest is used with other parameters other than key and keyLike. The status-message contains additional information.")
     })
     @GetMapping(value = "/event-registry-repository/event-definitions", produces = "application/json")
-    public DataResponse<EventDefinitionResponse> getEventDefinitions(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<EventDefinitionResponse> getEventDefinitions(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         EventDefinitionQuery eventDefinitionQuery = repositoryService.createEventDefinitionQuery();
 
         // Populate filter-parameters
@@ -133,8 +131,7 @@ public class EventDefinitionCollectionResource {
             eventDefinitionQuery.eventVersion(Integer.valueOf(allRequestParams.get("version")));
         }
         if (allRequestParams.containsKey("latest")) {
-            Boolean latest = Boolean.valueOf(allRequestParams.get("latest"));
-            if (latest != null && latest) {
+            if (Boolean.parseBoolean(allRequestParams.get("latest"))) {
                 eventDefinitionQuery.latestVersion();
             }
         }

@@ -13,11 +13,11 @@
 
 package org.flowable.variable.service.impl.persistence.entity;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import org.flowable.common.engine.impl.history.HistoryLevel;
 import org.flowable.common.engine.impl.persistence.entity.AbstractServiceEngineEntityManager;
 import org.flowable.variable.api.history.HistoricVariableInstance;
 import org.flowable.variable.service.VariableServiceConfiguration;
@@ -40,17 +40,9 @@ public class HistoricVariableInstanceEntityManagerImpl
     public HistoricVariableInstanceEntity create(VariableInstanceEntity variableInstance, Date createTime) {
         HistoricVariableInstanceEntity historicVariableInstance = dataManager.create();
         historicVariableInstance.setId(variableInstance.getId());
-        historicVariableInstance.setProcessInstanceId(variableInstance.getProcessInstanceId());
-        historicVariableInstance.setExecutionId(variableInstance.getExecutionId());
-        historicVariableInstance.setTaskId(variableInstance.getTaskId());
         historicVariableInstance.setRevision(variableInstance.getRevision());
-        historicVariableInstance.setName(variableInstance.getName());
-        historicVariableInstance.setVariableType(variableInstance.getType());
-        historicVariableInstance.setScopeId(variableInstance.getScopeId());
-        historicVariableInstance.setSubScopeId(variableInstance.getSubScopeId());
-        historicVariableInstance.setScopeType(variableInstance.getScopeType());
 
-        copyVariableValue(historicVariableInstance, variableInstance, createTime);
+        copyVariableFields(historicVariableInstance, variableInstance, createTime);
 
         historicVariableInstance.setCreateTime(createTime);
         historicVariableInstance.setLastUpdatedTime(createTime);
@@ -65,6 +57,21 @@ public class HistoricVariableInstanceEntityManagerImpl
         insert(historicVariableInstance);
 
         return historicVariableInstance;
+    }
+
+    @Override
+    public void copyVariableFields(HistoricVariableInstanceEntity historicVariableInstance, VariableInstanceEntity variableInstance, Date updateTime) {
+        historicVariableInstance.setProcessInstanceId(variableInstance.getProcessInstanceId());
+        historicVariableInstance.setExecutionId(variableInstance.getExecutionId());
+        historicVariableInstance.setTaskId(variableInstance.getTaskId());
+        historicVariableInstance.setName(variableInstance.getName());
+        historicVariableInstance.setVariableType(variableInstance.getType());
+        historicVariableInstance.setScopeId(variableInstance.getScopeId());
+        historicVariableInstance.setSubScopeId(variableInstance.getSubScopeId());
+        historicVariableInstance.setScopeType(variableInstance.getScopeType());
+        historicVariableInstance.setMetaInfo(variableInstance.getMetaInfo());
+
+        copyVariableValue(historicVariableInstance, variableInstance, updateTime);
     }
 
     @Override
@@ -93,11 +100,9 @@ public class HistoricVariableInstanceEntityManagerImpl
 
     @Override
     public void deleteHistoricVariableInstanceByProcessInstanceId(final String historicProcessInstanceId) {
-        if (serviceConfiguration.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY)) {
-            List<HistoricVariableInstanceEntity> historicProcessVariables = dataManager.findHistoricVariableInstancesByProcessInstanceId(historicProcessInstanceId);
-            for (HistoricVariableInstanceEntity historicProcessVariable : historicProcessVariables) {
-                delete(historicProcessVariable);
-            }
+        List<HistoricVariableInstanceEntity> historicProcessVariables = dataManager.findHistoricVariableInstancesByProcessInstanceId(historicProcessInstanceId);
+        for (HistoricVariableInstanceEntity historicProcessVariable : historicProcessVariables) {
+            delete(historicProcessVariable);
         }
     }
 
@@ -138,26 +143,35 @@ public class HistoricVariableInstanceEntityManagerImpl
 
     @Override
     public void deleteHistoricVariableInstancesByTaskId(String taskId) {
-        if (serviceConfiguration.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY)) {
-            List<HistoricVariableInstanceEntity> historicProcessVariables = dataManager.findHistoricVariableInstancesByTaskId(taskId);
-            for (HistoricVariableInstanceEntity historicProcessVariable : historicProcessVariables) {
-                delete(historicProcessVariable);
-            }
+        List<HistoricVariableInstanceEntity> historicProcessVariables = dataManager.findHistoricVariableInstancesByTaskId(taskId);
+        for (HistoricVariableInstanceEntity historicProcessVariable : historicProcessVariables) {
+            delete(historicProcessVariable);
         }
     }
-    
+
+    @Override
+    public void bulkDeleteHistoricVariableInstancesByProcessInstanceIds(Collection<String> processInstanceIds) {
+        dataManager.bulkDeleteHistoricVariableInstancesByProcessInstanceIds(processInstanceIds);
+    }
+
+    @Override
+    public void bulkDeleteHistoricVariableInstancesByTaskIds(Collection<String> taskIds) {
+        dataManager.bulkDeleteHistoricVariableInstancesByTaskIds(taskIds);
+    }
+
+    @Override
+    public void bulkDeleteHistoricVariableInstancesByScopeIdsAndScopeType(Collection<String> scopeIds, String scopeType) {
+        dataManager.bulkDeleteHistoricVariableInstancesByScopeIdsAndScopeType(scopeIds, scopeType);
+    }
+
     @Override
     public void deleteHistoricVariableInstancesForNonExistingProcessInstances() {
-        if (serviceConfiguration.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY)) {
-            dataManager.deleteHistoricVariableInstancesForNonExistingProcessInstances();
-        }
+        dataManager.deleteHistoricVariableInstancesForNonExistingProcessInstances();
     }
     
     @Override
     public void deleteHistoricVariableInstancesForNonExistingCaseInstances() {
-        if (serviceConfiguration.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY)) {
-            dataManager.deleteHistoricVariableInstancesForNonExistingCaseInstances();
-        }
+        dataManager.deleteHistoricVariableInstancesForNonExistingCaseInstances();
     }
 
     @Override

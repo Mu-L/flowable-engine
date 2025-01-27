@@ -12,6 +12,7 @@
  */
 package org.flowable.engine.impl.history;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.Map;
 
@@ -76,6 +77,11 @@ public interface HistoryManager {
      * Deletes historic process instances for a provided process definition id
      */
     void recordDeleteHistoricProcessInstancesByProcessDefinitionId(String processDefinitionId);
+    
+    /**
+     * Bulk delete historic process instances by id
+     */
+    void recordBulkDeleteProcessInstances(Collection<String> processInstanceIds);
 
     /**
      * Record the start of an activity, if activity history is enabled.
@@ -90,14 +96,6 @@ public interface HistoryManager {
      * @param activityInstance activity instance template
      */
     void recordActivityEnd(ActivityInstance activityInstance);
-
-    /**
-     * Record activity end in the case when runtime activity instance does not exist.
-     * @deprecated Shouldn't be used anymore, as an execution is not unique to an activity instance.
-     *             Use {@link HistoryManager#recordActivityEnd(ActivityInstance)} instead.
-     */
-    @Deprecated
-    void recordActivityEnd(ExecutionEntity executionEntity, String deleteReason, Date endTime);
 
     /**
      * Finds the {@link HistoricActivityInstanceEntity} that is active in the given execution.
@@ -117,7 +115,7 @@ public interface HistoryManager {
     /**
      * Record task as ended, if audit history is enabled.
      */
-    void recordTaskEnd(TaskEntity task, ExecutionEntity execution, String deleteReason, Date endTime);
+    void recordTaskEnd(TaskEntity task, ExecutionEntity execution, String userId, String deleteReason, Date endTime);
 
     /**
      * Record task name change, if audit history is enabled.

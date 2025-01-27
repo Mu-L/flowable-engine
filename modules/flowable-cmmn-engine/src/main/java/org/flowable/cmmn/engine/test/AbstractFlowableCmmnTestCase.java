@@ -39,16 +39,20 @@ import org.flowable.cmmn.api.CmmnRuntimeService;
 import org.flowable.cmmn.api.CmmnTaskService;
 import org.flowable.cmmn.api.DynamicCmmnService;
 import org.flowable.cmmn.api.history.HistoricPlanItemInstance;
+import org.flowable.cmmn.api.repository.CaseDefinition;
 import org.flowable.cmmn.api.repository.CmmnDeployment;
 import org.flowable.cmmn.api.runtime.CaseInstance;
 import org.flowable.cmmn.api.runtime.PlanItemInstance;
 import org.flowable.cmmn.engine.CmmnEngine;
 import org.flowable.cmmn.engine.CmmnEngineConfiguration;
+import org.flowable.cmmn.engine.impl.history.CmmnHistoryManager;
+import org.flowable.cmmn.engine.impl.history.DefaultCmmnHistoryManager;
 import org.flowable.cmmn.engine.test.impl.CmmnHistoryTestHelper;
 import org.flowable.cmmn.engine.test.impl.CmmnJobTestHelper;
 import org.flowable.cmmn.engine.test.impl.CmmnTestHelper;
 import org.flowable.cmmn.engine.test.impl.CmmnTestRunner;
 import org.flowable.common.engine.impl.history.HistoryLevel;
+import org.flowable.common.engine.impl.identity.Authentication;
 import org.flowable.task.api.Task;
 import org.junit.After;
 import org.junit.runner.RunWith;
@@ -90,6 +94,7 @@ public abstract class AbstractFlowableCmmnTestCase {
             }
         }
         autoCleanupDeploymentIds = new HashSet<>();
+        Authentication.setAuthenticatedUserId(null);
     }
 
     protected void deployOneHumanTaskCaseModel() {
@@ -108,6 +113,35 @@ public abstract class AbstractFlowableCmmnTestCase {
         addDeploymentForAutoCleanup(cmmnRepositoryService.createDeployment()
                 .addClasspathResource("org/flowable/cmmn/test/one-task-model.cmmn")
                 .deploy());
+    }
+
+    protected CaseDefinition deployCaseDefinition(String name, String path) {
+        CmmnDeployment deployment = cmmnRepositoryService.createDeployment()
+            .name(name)
+            .addClasspathResource(path)
+            .deploy();
+
+        CaseDefinition caseDefinition = cmmnRepositoryService.createCaseDefinitionQuery()
+            .deploymentId(deployment.getId()).singleResult();
+
+        return caseDefinition;
+    }
+
+    protected void deleteDeployment(String deploymentId) {
+        boolean isAsyncHistoryEnabled = cmmnEngineConfiguration.isAsyncHistoryEnabled();
+        CmmnHistoryManager asyncHistoryManager = null;
+        if (isAsyncHistoryEnabled) {
+            cmmnEngineConfiguration.setAsyncHistoryEnabled(false);
+            asyncHistoryManager = cmmnEngineConfiguration.getCmmnHistoryManager();
+            cmmnEngineConfiguration.setCmmnHistoryManager(new DefaultCmmnHistoryManager(cmmnEngineConfiguration));
+        }
+
+        cmmnRepositoryService.deleteDeployment(deploymentId, true);
+
+        if (isAsyncHistoryEnabled) {
+            cmmnEngineConfiguration.setAsyncHistoryEnabled(true);
+            cmmnEngineConfiguration.setCmmnHistoryManager(asyncHistoryManager);
+        }
     }
     
     protected Date setClockFixedToCurrentTime() {
@@ -212,7 +246,7 @@ public abstract class AbstractFlowableCmmnTestCase {
                 assertEquals(runtimePlanItem.getState(), historicPlanItemInstance.getState());
             }
 
-            assertEquals(historyMap.size(), 0);
+            assertEquals(0, historyMap.size());
         }
     }
 
@@ -233,7 +267,8 @@ public abstract class AbstractFlowableCmmnTestCase {
             .collect(Collectors.toList());
 
         if (planItemInstanceStates.isEmpty()) {
-            fail("No plan item instances found with name " + name);
+            List<String> planItemInstanceNames = planItemInstances.stream().map(PlanItemInstance::getName).collect(Collectors.toList());
+            fail("No plan item instances found with name " + name + ", following names were found:" + String.join(",", planItemInstanceNames));
         }
 
         assertEquals("Incorrect number of states found: " + planItemInstanceStates, states.length, planItemInstanceStates.size());

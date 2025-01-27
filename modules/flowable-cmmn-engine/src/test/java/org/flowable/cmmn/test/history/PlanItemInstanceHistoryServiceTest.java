@@ -14,6 +14,8 @@ package org.flowable.cmmn.test.history;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -532,7 +534,7 @@ public class PlanItemInstanceHistoryServiceTest extends FlowableCmmnTestCase {
     @Test
     @CmmnDeployment
     public void testQueryByUnavailableState() {
-        Date startTime = new Date();
+        Date startTime = Date.from(Instant.now().truncatedTo(ChronoUnit.SECONDS));
         setClockTo(startTime);
 
         CaseInstance caseInstance = cmmnRuntimeService.createCaseInstanceBuilder().caseDefinitionKey("testAvailableCondition").start();
@@ -566,12 +568,22 @@ public class PlanItemInstanceHistoryServiceTest extends FlowableCmmnTestCase {
         List<PlanItemInstance> planItemInstances = cmmnRuntimeService.createPlanItemInstanceQuery().planItemInstanceLastUnavailableAfter(startTime).list();
         assertThat(planItemInstances).extracting(PlanItemInstance::getName).containsExactly("myEventListener");
 
+        planItemInstances = cmmnRuntimeService.createPlanItemInstanceQuery()
+                .or().caseInstanceId("undefinedId").planItemInstanceLastUnavailableAfter(startTime).endOr()
+                .list();
+        assertThat(planItemInstances).extracting(PlanItemInstance::getName).containsExactly("myEventListener");
+
         if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, cmmnEngineConfiguration)) {
             List<HistoricPlanItemInstance> historicPlanItemInstances = cmmnHistoryService.createHistoricPlanItemInstanceQuery().lastUnavailableAfter(startTime).list();
             assertThat(historicPlanItemInstances).extracting(HistoricPlanItemInstance::getName).containsExactly("myEventListener");
         }
 
         planItemInstances = cmmnRuntimeService.createPlanItemInstanceQuery().planItemInstanceLastUnavailableAfter(afterStartTime).list();
+        assertThat(planItemInstances).extracting(PlanItemInstance::getName).isEmpty();
+
+        planItemInstances = cmmnRuntimeService.createPlanItemInstanceQuery()
+                .or().caseInstanceId("undefinedId").planItemInstanceLastUnavailableAfter(afterStartTime).endOr()
+                .list();
         assertThat(planItemInstances).extracting(PlanItemInstance::getName).isEmpty();
 
         if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, cmmnEngineConfiguration)) {
@@ -583,6 +595,11 @@ public class PlanItemInstanceHistoryServiceTest extends FlowableCmmnTestCase {
         planItemInstances = cmmnRuntimeService.createPlanItemInstanceQuery().planItemInstanceLastUnavailableBefore(afterStartTime).list();
         assertThat(planItemInstances).extracting(PlanItemInstance::getName).containsExactly("myEventListener");
 
+        planItemInstances = cmmnRuntimeService.createPlanItemInstanceQuery()
+                .or().caseInstanceId("undefinedId").planItemInstanceLastUnavailableBefore(afterStartTime).endOr()
+                .list();
+        assertThat(planItemInstances).extracting(PlanItemInstance::getName).containsExactly("myEventListener");
+
         if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, cmmnEngineConfiguration)) {
             List<HistoricPlanItemInstance> historicPlanItemInstances = cmmnHistoryService.createHistoricPlanItemInstanceQuery().lastUnavailableBefore(afterStartTime).list();
             assertThat(historicPlanItemInstances).extracting(HistoricPlanItemInstance::getName).containsExactly("myEventListener");
@@ -590,6 +607,11 @@ public class PlanItemInstanceHistoryServiceTest extends FlowableCmmnTestCase {
 
         Date beforeStartTime = new Date(startTime.getTime() - 10000);
         planItemInstances = cmmnRuntimeService.createPlanItemInstanceQuery().planItemInstanceLastUnavailableBefore(beforeStartTime).list();
+        assertThat(planItemInstances).extracting(PlanItemInstance::getName).isEmpty();
+
+        planItemInstances = cmmnRuntimeService.createPlanItemInstanceQuery()
+                .or().caseInstanceId("undefinedId").planItemInstanceLastUnavailableBefore(beforeStartTime).endOr()
+                .list();
         assertThat(planItemInstances).extracting(PlanItemInstance::getName).isEmpty();
 
         if (CmmnHistoryTestHelper.isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, cmmnEngineConfiguration)) {

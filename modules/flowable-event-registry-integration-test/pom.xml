@@ -9,7 +9,7 @@
         <groupId>org.flowable</groupId>
         <artifactId>flowable-root</artifactId>
         <relativePath>../..</relativePath>
-        <version>6.7.3-SNAPSHOT</version>
+        <version>7.1.1-SNAPSHOT</version>
     </parent>
 
     <properties>
@@ -20,6 +20,8 @@
         <flowable.osgi.import.additional>
           org.springframework.test.context*;resolution:=optional,
         </flowable.osgi.import.additional>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <skip.test.db.drop>false</skip.test.db.drop>
     </properties>
 
     <dependencies>
@@ -114,8 +116,7 @@
 
         <dependency>
             <groupId>org.apache.activemq</groupId>
-            <artifactId>activemq-broker</artifactId>
-            <version>5.16.3</version>
+            <artifactId>artemis-jakarta-server</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -127,6 +128,16 @@
         <dependency>
             <groupId>net.javacrumbs.json-unit</groupId>
             <artifactId>json-unit-assertj</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.flowable</groupId>
+            <artifactId>flowable-idm-spring-configurator</artifactId>
             <scope>test</scope>
         </dependency>
 

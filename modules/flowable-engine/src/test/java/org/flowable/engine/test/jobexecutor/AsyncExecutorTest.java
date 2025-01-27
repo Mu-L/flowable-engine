@@ -95,6 +95,36 @@ public class AsyncExecutorTest {
     }
 
     @Test
+    public void testAsyncExecutionForStraightThroughParallelMultiInstance() {
+
+        ProcessEngine processEngine = null;
+
+        try {
+            // Deploy
+            processEngine = createProcessEngine(true);
+            setClockToCurrentTime(processEngine);
+            deploy(processEngine, "AsyncExecutorTest.testStraightThroughParallelMultiInstance.bpmn20.xml");
+
+            // Start process instance. Wait for all jobs to be done
+            ProcessInstance processInstance = processEngine.getRuntimeService()
+                    .createProcessInstanceBuilder()
+                    .processDefinitionKey("asyncExecutor")
+                    .transientVariable("loopCardinality", 2)
+                    .start();
+            assertThat(processEngine.getRuntimeService().createProcessInstanceQuery().processInstanceId(processInstance.getId()).singleResult())
+                    .isNull();
+
+            assertThat(getAsyncExecutorJobCount(processEngine)).isZero();
+        } finally {
+
+            // Clean up
+            if (processEngine != null) {
+                cleanup(processEngine);
+            }
+        }
+    }
+
+    @Test
     public void testAsyncExecutorDisabledOnOneEngine() {
 
         ProcessEngine firstProcessEngine = null;
@@ -194,7 +224,8 @@ public class AsyncExecutorTest {
             processEngine.getRuntimeService().startProcessInstanceByKey("asyncScript");
 
             final ProcessEngine processEngineCopy = processEngine;
-            JobTestHelper.waitForJobExecutorOnCondition(processEngine.getProcessEngineConfiguration(), 10000L, 1000L, new Callable<Boolean>() {
+            JobTestHelper.waitForJobExecutorOnCondition(processEngine.getProcessEngineConfiguration(), 10000L, 1000L, new Callable<>() {
+
                 @Override
                 public Boolean call() throws Exception {
                     long timerJobCount = processEngineCopy.getManagementService().createTimerJobQuery().count();
@@ -239,7 +270,8 @@ public class AsyncExecutorTest {
             processEngine.getRuntimeService().startProcessInstanceByKey("asyncScript");
 
             final ProcessEngine processEngineCopy = processEngine;
-            JobTestHelper.waitForJobExecutorOnCondition(processEngine.getProcessEngineConfiguration(), 10000L, 1000L, new Callable<Boolean>() {
+            JobTestHelper.waitForJobExecutorOnCondition(processEngine.getProcessEngineConfiguration(), 10000L, 1000L, new Callable<>() {
+
                 @Override
                 public Boolean call() throws Exception {
                     long timerJobCount = processEngineCopy.getManagementService().createTimerJobQuery().count();

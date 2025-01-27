@@ -18,7 +18,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
+import org.flowable.bpmn.model.FlowElement;
+import org.flowable.bpmn.model.UserTask;
 import org.flowable.common.engine.api.FlowableException;
+import org.flowable.common.engine.api.delegate.Expression;
 import org.flowable.common.engine.api.delegate.event.FlowableEngineEventType;
 import org.flowable.common.engine.api.delegate.event.FlowableEventDispatcher;
 import org.flowable.common.engine.api.scope.ScopeTypes;
@@ -30,8 +33,10 @@ import org.flowable.common.engine.impl.interceptor.CommandContext;
 import org.flowable.common.engine.impl.logging.LoggingSessionConstants;
 import org.flowable.common.engine.impl.persistence.entity.ByteArrayRef;
 import org.flowable.engine.compatibility.Flowable5CompatibilityHandler;
+import org.flowable.engine.delegate.BpmnError;
 import org.flowable.engine.delegate.TaskListener;
 import org.flowable.engine.delegate.event.impl.FlowableEventBuilder;
+import org.flowable.engine.impl.bpmn.helper.ErrorPropagation;
 import org.flowable.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.flowable.engine.impl.persistence.CountingExecutionEntity;
 import org.flowable.engine.impl.persistence.entity.ExecutionEntity;
@@ -59,11 +64,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  */
 public class TaskHelper {
 
-    public static void completeTask(TaskEntity taskEntity, Map<String, Object> variables, Map<String, Object> localVariables,
+    public static void completeTask(TaskEntity taskEntity, String userId, Map<String, Object> variables, Map<String, Object> localVariables,
             Map<String, Object> transientVariables, Map<String, Object> localTransientVariables, CommandContext commandContext) {
 
         if (taskEntity.getDelegationState() != null && taskEntity.getDelegationState() == DelegationState.PENDING) {
-            throw new FlowableException("A delegated task cannot be completed, but should be resolved instead.");
+            throw new FlowableException("A delegated " + taskEntity + " cannot be completed, but should be resolved instead.");
         }
 
         if (localVariables != null && !localVariables.isEmpty()) {
@@ -81,7 +86,6 @@ public class TaskHelper {
                 taskEntity.setVariables(variables);
 
             }
-
         }
 
         if (localTransientVariables != null && !localTransientVariables.isEmpty()) {
@@ -99,17 +103,34 @@ public class TaskHelper {
                 taskEntity.setTransientVariables(transientVariables);
 
             }
-
         }
 
         ProcessEngineConfigurationImpl processEngineConfiguration = CommandContextUtil.getProcessEngineConfiguration(commandContext);
-        processEngineConfiguration.getListenerNotificationHelper().executeTaskListeners(taskEntity, TaskListener.EVENTNAME_COMPLETE);
+        boolean bpmnErrorPropagated = false;
+        try {
+            processEngineConfiguration.getListenerNotificationHelper().executeTaskListeners(taskEntity, TaskListener.EVENTNAME_COMPLETE);
+        } catch (BpmnError bpmnError) {
+            if (taskEntity.getExecutionId() != null) {
+                ExecutionEntity execution = CommandContextUtil.getExecutionEntityManager().findById(taskEntity.getExecutionId());
+                if (execution != null) {
+                    ErrorPropagation.propagateError(bpmnError, execution);
+                    bpmnErrorPropagated = true;
+                }
+            }
+        }
 
         if (processEngineConfiguration.getIdentityLinkInterceptor() != null) {
             processEngineConfiguration.getIdentityLinkInterceptor().handleCompleteTask(taskEntity);
         }
 
         logUserTaskCompleted(taskEntity);
+
+        if (taskEntity.getExecutionId() != null) {
+            ExecutionEntity execution = CommandContextUtil.getExecutionEntityManager().findById(taskEntity.getExecutionId());
+            if (execution != null) {
+                storeTaskCompleter(taskEntity, execution, processEngineConfiguration);
+            }
+        }
 
         FlowableEventDispatcher eventDispatcher = processEngineConfiguration.getEventDispatcher();
         if (eventDispatcher != null && eventDispatcher.isEnabled()) {
@@ -151,10 +172,10 @@ public class TaskHelper {
             }
         }
 
-        deleteTask(taskEntity, null, false, true, true);
+        completeTask(taskEntity, userId);
 
         // Continue process (if not a standalone task)
-        if (taskEntity.getExecutionId() != null) {
+        if (taskEntity.getExecutionId() != null && !bpmnErrorPropagated) {
             ExecutionEntity executionEntity = processEngineConfiguration.getExecutionEntityManager().findById(taskEntity.getExecutionId());
             CommandContextUtil.getAgenda(commandContext).planTriggerExecutionOperation(executionEntity);
         }
@@ -171,6 +192,25 @@ public class TaskHelper {
             taskLogEntryBuilder.data(data.toString());
             taskLogEntryBuilder.type(HistoricTaskLogEntryType.USER_TASK_COMPLETED.name());
             taskServiceConfiguration.getInternalHistoryTaskManager().recordHistoryUserTaskLog(taskLogEntryBuilder);
+        }
+    }
+
+    protected static void storeTaskCompleter(TaskEntity taskEntity, ExecutionEntity execution, ProcessEngineConfigurationImpl processEngineConfiguration) {
+        if (taskEntity.getProcessDefinitionId() != null) {
+            FlowElement flowElement = execution.getCurrentFlowElement();
+            if (flowElement instanceof UserTask) {
+                UserTask userTask = (UserTask) flowElement;
+                String taskCompleterVariableName = userTask.getTaskCompleterVariableName();
+                if (StringUtils.isNotEmpty(taskCompleterVariableName)) {
+                    ExpressionManager expressionManager = processEngineConfiguration.getExpressionManager();
+                    Expression expression = expressionManager.createExpression(userTask.getTaskCompleterVariableName());
+                    String completerVariableName = (String) expression.getValue(execution);
+                    String completer = Authentication.getAuthenticatedUserId();
+                    if (StringUtils.isNotEmpty(completerVariableName)) {
+                        execution.setVariable(completerVariableName, completer);
+                    }
+                }
+            }
         }
     }
 
@@ -283,12 +323,16 @@ public class TaskHelper {
 
         // Delete all entities related to the task entities
         for (TaskEntity taskEntity : taskEntities) {
-            internalDeleteTask(taskEntity, deleteReason, false, false, true, true);
+            internalDeleteTask(taskEntity, null, deleteReason, false, false, true, true);
         }
         
         // Delete the task entities itself
         processEngineConfiguration.getTaskServiceConfiguration().getTaskService().deleteTasksByExecutionId(executionEntity.getId());
         
+    }
+    
+    public static void completeTask(TaskEntity task, String userId) {
+        internalDeleteTask(task, userId, null, false, true, true, true);
     }
 
     /**
@@ -306,10 +350,10 @@ public class TaskHelper {
      *            for the deletion.
      */
     public static void deleteTask(TaskEntity task, String deleteReason, boolean cascade, boolean fireTaskListener, boolean fireEvents) {
-        internalDeleteTask(task, deleteReason, cascade, true, fireTaskListener, fireEvents);
+        internalDeleteTask(task, null, deleteReason, cascade, true, fireTaskListener, fireEvents);
     }
         
-    protected static void internalDeleteTask(TaskEntity task, String deleteReason, 
+    protected static void internalDeleteTask(TaskEntity task, String userId, String deleteReason, 
             boolean cascade, boolean executeTaskDelete, boolean fireTaskListener, boolean fireEvents) {
         
         if (!task.isDeleted()) {
@@ -319,14 +363,21 @@ public class TaskHelper {
             fireEvents = fireEvents && eventDispatcher != null && eventDispatcher.isEnabled();
 
             if (fireTaskListener) {
-                CommandContextUtil.getProcessEngineConfiguration(commandContext).getListenerNotificationHelper()
-                        .executeTaskListeners(task, TaskListener.EVENTNAME_DELETE);
+                try {
+                    CommandContextUtil.getProcessEngineConfiguration(commandContext).getListenerNotificationHelper()
+                            .executeTaskListeners(task, TaskListener.EVENTNAME_DELETE);
+                } catch (BpmnError bpmnError) {
+                    ExecutionEntity execution = CommandContextUtil.getExecutionEntityManager().findById(task.getExecutionId());
+                    if (execution != null) {
+                        ErrorPropagation.propagateError(bpmnError, execution);
+                    }
+                }
             }
 
             task.setDeleted(true);
 
-            handleRelatedEntities(commandContext, task, deleteReason, cascade, fireTaskListener, fireEvents, eventDispatcher);
-            handleTaskHistory(commandContext, task, deleteReason, cascade);
+            handleRelatedEntities(task, deleteReason, cascade, fireTaskListener, fireEvents, eventDispatcher, commandContext);
+            handleTaskHistory(task, userId, deleteReason, cascade, commandContext);
 
             if (executeTaskDelete) {
                 executeTaskDelete(task, commandContext);
@@ -339,8 +390,8 @@ public class TaskHelper {
         }
     }
 
-    protected static void handleRelatedEntities(CommandContext commandContext, TaskEntity task, String deleteReason, boolean cascade,
-            boolean fireTaskListener, boolean fireEvents, FlowableEventDispatcher eventDispatcher) {
+    protected static void handleRelatedEntities(TaskEntity task, String deleteReason, boolean cascade,
+            boolean fireTaskListener, boolean fireEvents, FlowableEventDispatcher eventDispatcher, CommandContext commandContext) {
         
         boolean isTaskRelatedEntityCountEnabled = CountingEntityUtil.isTaskRelatedEntityCountEnabled(task);
         
@@ -350,7 +401,7 @@ public class TaskHelper {
             TaskService taskService = processEngineConfiguration.getTaskServiceConfiguration().getTaskService();
             List<Task> subTasks = taskService.findTasksByParentTaskId(task.getId());
             for (Task subTask : subTasks) {
-                internalDeleteTask((TaskEntity) subTask, deleteReason, cascade, true, fireTaskListener, fireEvents); // Sub tasks are always immediately deleted
+                internalDeleteTask((TaskEntity) subTask, null, deleteReason, cascade, true, fireTaskListener, fireEvents); // Sub tasks are always immediately deleted
             }
         }
         
@@ -399,7 +450,7 @@ public class TaskHelper {
         }
     }
 
-    protected static void handleTaskHistory(CommandContext commandContext, TaskEntity task, String deleteReason, boolean cascade) {
+    protected static void handleTaskHistory(TaskEntity task, String userId, String deleteReason, boolean cascade, CommandContext commandContext) {
         if (cascade) {
             deleteHistoricTask(task.getId());
         } else {
@@ -407,8 +458,8 @@ public class TaskHelper {
             if (task.getExecutionId() != null) {
                 execution = CommandContextUtil.getExecutionEntityManager(commandContext).findById(task.getExecutionId());
             }
-            CommandContextUtil.getHistoryManager(commandContext)
-                .recordTaskEnd(task, execution, deleteReason, CommandContextUtil.getProcessEngineConfiguration(commandContext).getClock().getCurrentTime());
+            CommandContextUtil.getActivityInstanceEntityManager(commandContext).recordActivityTaskEnd(task, execution,
+                    userId, deleteReason, CommandContextUtil.getProcessEngineConfiguration(commandContext).getClock().getCurrentTime());
         }
     }
 
@@ -441,9 +492,9 @@ public class TaskHelper {
 
         if (task != null) {
             if (task.getExecutionId() != null) {
-                throw new FlowableException("The task cannot be deleted because is part of a running process");
+                throw new FlowableException("The " + task + " cannot be deleted because is part of a running process");
             } else if (task.getScopeId() != null && ScopeTypes.CMMN.equals(task.getScopeType())) {
-                throw new FlowableException("The task cannot be deleted because is part of a running case");
+                throw new FlowableException("The " + task + " cannot be deleted because is part of a running case");
             }
 
             if (Flowable5Util.isFlowable5ProcessDefinitionId(commandContext, task.getProcessDefinitionId())) {
@@ -491,6 +542,18 @@ public class TaskHelper {
             }
         }
     }
+    
+    public static void bulkDeleteHistoricTaskInstancesForProcessInstanceIds(Collection<String> processInstanceIds) {
+        ProcessEngineConfigurationImpl processEngineConfiguration = CommandContextUtil.getProcessEngineConfiguration();
+        if (processEngineConfiguration.getHistoryManager().isHistoryEnabled()) {
+            List<String> taskIds = processEngineConfiguration.getTaskServiceConfiguration().getHistoricTaskInstanceEntityManager()
+                    .findHistoricTaskIdsForProcessInstanceIds(processInstanceIds);
+            
+            if (taskIds != null && !taskIds.isEmpty()) {
+                bulkDeleteHistoricTaskInstances(taskIds, processEngineConfiguration);
+            }
+        }
+    }
 
     public static void deleteHistoricTask(String taskId) {
         ProcessEngineConfigurationImpl processEngineConfiguration = CommandContextUtil.getProcessEngineConfiguration();
@@ -515,7 +578,9 @@ public class TaskHelper {
                 }
 
                 processEngineConfiguration.getHistoricDetailEntityManager().deleteHistoricDetailsByTaskId(taskId);
-                processEngineConfiguration.getVariableServiceConfiguration().getHistoricVariableService().deleteHistoricVariableInstancesByTaskId(taskId);
+                if (processEngineConfiguration.getHistoryConfigurationSettings().isHistoryEnabledForVariables(historicTaskInstance)) {
+                    processEngineConfiguration.getVariableServiceConfiguration().getHistoricVariableService().deleteHistoricVariableInstancesByTaskId(taskId);
+                }
                 processEngineConfiguration.getIdentityLinkServiceConfiguration().getHistoricIdentityLinkService().deleteHistoricIdentityLinksByTaskId(taskId);
 
                 historicTaskService.deleteHistoricTask(historicTaskInstance);
@@ -547,13 +612,31 @@ public class TaskHelper {
                     expressionManager.createExpression(formFieldValidationExpression).getValue(variableContainer)
                 );
                 if (formFieldValidationValue == null) {
-                    throw new FlowableException("Unable to resolve formFieldValidationExpression to boolean value");
+                    throw new FlowableException("Unable to resolve formFieldValidationExpression to boolean value for " + variableContainer);
                 }
                 return formFieldValidationValue;
             }
             throw new FlowableException("Unable to resolve formFieldValidationExpression without variable container");
         }
         return true;
+    }
+    
+    protected static void bulkDeleteHistoricTaskInstances(Collection<String> taskIds, ProcessEngineConfigurationImpl processEngineConfiguration) {
+        HistoricTaskService historicTaskService = processEngineConfiguration.getTaskServiceConfiguration().getHistoricTaskService();
+        List<String> subTaskIds = historicTaskService.findHistoricTaskIdsByParentTaskIds(taskIds);
+        if (subTaskIds != null && !subTaskIds.isEmpty()) {
+            bulkDeleteHistoricTaskInstances(subTaskIds, processEngineConfiguration);
+        }
+        
+        processEngineConfiguration.getCommentEntityManager().bulkDeleteCommentsForTaskIds(taskIds);
+        processEngineConfiguration.getAttachmentEntityManager().bulkDeleteAttachmentsByTaskId(taskIds);
+        
+        processEngineConfiguration.getHistoricDetailEntityManager().bulkDeleteHistoricDetailsByTaskIds(taskIds);
+        processEngineConfiguration.getVariableServiceConfiguration().getHistoricVariableService().bulkDeleteHistoricVariableInstancesByTaskIds(taskIds);
+        processEngineConfiguration.getIdentityLinkServiceConfiguration().getHistoricIdentityLinkService().bulkDeleteHistoricIdentityLinksForTaskIds(taskIds);
+
+        historicTaskService.bulkDeleteHistoricTaskInstances(taskIds);
+        historicTaskService.bulkDeleteHistoricTaskLogEntriesForTaskIds(taskIds);
     }
 
     protected static Boolean getBoolean(Object booleanObject) {
@@ -573,7 +656,11 @@ public class TaskHelper {
 
     protected static void fireAssignmentEvents(TaskEntity taskEntity) {
         ProcessEngineConfigurationImpl processEngineConfiguration = CommandContextUtil.getProcessEngineConfiguration();
-        processEngineConfiguration.getListenerNotificationHelper().executeTaskListeners(taskEntity, TaskListener.EVENTNAME_ASSIGNMENT);
+        try {
+            processEngineConfiguration.getListenerNotificationHelper().executeTaskListeners(taskEntity, TaskListener.EVENTNAME_ASSIGNMENT);
+        } catch (BpmnError e) {
+            ErrorPropagation.propagateError(e, CommandContextUtil.getExecutionEntityManager().findById(taskEntity.getExecutionId()));
+        }
 
         FlowableEventDispatcher eventDispatcher = processEngineConfiguration.getEventDispatcher();
         if (eventDispatcher != null && eventDispatcher.isEnabled()) {

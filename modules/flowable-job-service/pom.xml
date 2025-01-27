@@ -10,7 +10,7 @@
 		<groupId>org.flowable</groupId>
 		<artifactId>flowable-root</artifactId>
 		<relativePath>../..</relativePath>
-		<version>6.7.3-SNAPSHOT</version>
+		<version>7.1.1-SNAPSHOT</version>
 	</parent>
 
 	<dependencies>
@@ -43,13 +43,13 @@
             <artifactId>joda-time</artifactId>
         </dependency>
         <dependency>
-            <groupId>javax.persistence</groupId>
-            <artifactId>javax.persistence-api</artifactId>
+			<groupId>jakarta.persistence</groupId>
+			<artifactId>jakarta.persistence-api</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>javax.enterprise.concurrent</groupId>
-            <artifactId>javax.enterprise.concurrent-api</artifactId>
+			<groupId>jakarta.enterprise.concurrent</groupId>
+			<artifactId>jakarta.enterprise.concurrent-api</artifactId>
             <scope>provided</scope>
         </dependency>
 		<dependency>
@@ -104,9 +104,10 @@
 		<flowable.osgi.export.additional>
 			org.flowable.job.service.db.mapping.entity
 		</flowable.osgi.export.additional>
-        <flowable.osgi.import.additional>
-            javax.enterprise.concurrent;resolution:=optional,
-        </flowable.osgi.import.additional>
+		<flowable.osgi.import.additional>
+			jakarta.enterprise.concurrent;resolution:=optional,
+			org.springframework*;resolution:=optional
+		</flowable.osgi.import.additional>
 	</properties>
 
 	<build>

@@ -15,9 +15,6 @@ package org.flowable.cmmn.rest.service.api.runtime.caze;
 
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.flowable.cmmn.api.runtime.CaseInstance;
 import org.flowable.cmmn.rest.service.api.engine.RestIdentityLink;
 import org.flowable.common.engine.api.FlowableIllegalArgumentException;
@@ -27,6 +24,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.annotations.Api;
@@ -50,37 +48,43 @@ public class CaseInstanceIdentityLinkResource extends BaseCaseInstanceResource {
             @ApiResponse(code = 404, message = "Indicates the requested case instance was not found or the link to delete does not exist. The response status contains additional information about the error.")
     })
     @GetMapping(value = "/cmmn-runtime/case-instances/{caseInstanceId}/identitylinks/users/{identityId}/{type}", produces = "application/json")
-    public RestIdentityLink getIdentityLink(@ApiParam(name = "caseInstanceId") @PathVariable("caseInstanceId") String caseInstanceId, @ApiParam(name = "identityId") @PathVariable("identityId") String identityId,
-            @ApiParam(name = "type") @PathVariable("type") String type,
-            HttpServletRequest request) {
+    public RestIdentityLink getIdentityLinkRequest(@ApiParam(name = "caseInstanceId") @PathVariable("caseInstanceId") String caseInstanceId, @ApiParam(name = "identityId") @PathVariable("identityId") String identityId,
+            @ApiParam(name = "type") @PathVariable("type") String type) {
 
-        CaseInstance caseInstance = getCaseInstanceFromRequest(caseInstanceId);
+        CaseInstance caseInstance = getCaseInstanceFromRequestWithoutAccessCheck(caseInstanceId);
 
         validateIdentityLinkArguments(identityId, type);
 
         IdentityLink link = getIdentityLink(identityId, type, caseInstance.getId());
+
+        if (restApiInterceptor != null) {
+            restApiInterceptor.accessCaseInstanceIdentityLink(caseInstance, link);
+        }
+
         return restResponseFactory.createRestIdentityLink(link);
     }
 
-    @ApiOperation(value = "Remove an involved user to from case instance", tags = { "Case Instance Identity Links" }, nickname = "deleteCaseInstanceIdentityLinks")
+    @ApiOperation(value = "Remove an involved user to from case instance", tags = { "Case Instance Identity Links" }, nickname = "deleteCaseInstanceIdentityLinks", code = 204)
     @ApiResponses(value = {
             @ApiResponse(code = 204, message = "Indicates the case instance was found and the link has been deleted. Response body is left empty intentionally."),
             @ApiResponse(code = 404, message = "Indicates the requested case instance was not found or the link to delete does not exist. The response status contains additional information about the error.")
     })
     @DeleteMapping(value = "/cmmn-runtime/case-instances/{caseInstanceId}/identitylinks/users/{identityId}/{type}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteIdentityLink(@ApiParam(name = "caseInstanceId") @PathVariable("caseInstanceId") String caseInstanceId, @ApiParam(name = "identityId") @PathVariable("identityId") String identityId,
-            @ApiParam(name = "type") @PathVariable("type") String type,
-            HttpServletResponse response) {
+            @ApiParam(name = "type") @PathVariable("type") String type) {
 
-        CaseInstance caseInstance = getCaseInstanceFromRequest(caseInstanceId);
+        CaseInstance caseInstance = getCaseInstanceFromRequestWithoutAccessCheck(caseInstanceId);
 
         validateIdentityLinkArguments(identityId, type);
 
-        getIdentityLink(identityId, type, caseInstance.getId());
+        IdentityLink link = getIdentityLink(identityId, type, caseInstance.getId());
+
+        if (restApiInterceptor != null) {
+            restApiInterceptor.deleteCaseInstanceIdentityLink(caseInstance, link);
+        }
 
         runtimeService.deleteUserIdentityLink(caseInstance.getId(), identityId, type);
-
-        response.setStatus(HttpStatus.NO_CONTENT.value());
     }
 
     protected void validateIdentityLinkArguments(String identityId, String type) {

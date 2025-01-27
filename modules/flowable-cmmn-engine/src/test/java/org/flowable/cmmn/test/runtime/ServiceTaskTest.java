@@ -484,10 +484,12 @@ public class ServiceTaskTest extends FlowableCmmnTestCase {
                 })
                 .start())
                 .isExactlyInstanceOf(FlowableException.class)
-                .hasMessage("Error while evaluating expression: ${testBean.invoke()}")
-                .getCause()
+                .hasMessageStartingWith("Error while evaluating expression: ${testBean.invoke()} with PlanItemInstance with id: ")
+                .hasMessageContainingAll("name: Task One", "definitionId: serviceTask", "state: active", "elementId: planItem1",
+                        "caseInstanceId: ", "caseDefinitionId: ")
+                .cause()
                 .isInstanceOf(ELException.class)
-                .getCause()
+                .cause()
                 .isInstanceOf(FlowableIllegalArgumentException.class)
                 .hasNoCause()
                 .hasMessage("test exception");
@@ -506,10 +508,12 @@ public class ServiceTaskTest extends FlowableCmmnTestCase {
                 })
                 .start())
                 .isExactlyInstanceOf(FlowableException.class)
-                .hasMessage("Error while evaluating expression: ${testBean.invoke()}")
-                .getCause()
+                .hasMessageStartingWith("Error while evaluating expression: ${testBean.invoke()} with PlanItemInstance with id: ")
+                .hasMessageContainingAll("name: Task One", "definitionId: serviceTask", "state: active", "elementId: planItem1",
+                        "caseInstanceId: ", "caseDefinitionId: ")
+                .cause()
                 .isInstanceOf(ELException.class)
-                .getCause()
+                .cause()
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasNoCause()
                 .hasMessage("test exception");

@@ -64,6 +64,10 @@ public class PlanItemInstancesWrapper {
         return planItemInstances.size();
     }
 
+    public boolean exists() {
+        return count() > 0;
+    }
+
     protected void ensurePlanItemInstanceInitialized() {
         if (planItemInstances == null) {
             planItemInstances = collectAllChildPlanItemInstances(caseInstanceEntity);
@@ -184,6 +188,10 @@ public class PlanItemInstancesWrapper {
 
     public PlanItemInstancesWrapper asyncActive() {
         return getPlanItemInstancesWithState(PlanItemInstanceState.ASYNC_ACTIVE);
+    }
+
+    public PlanItemInstancesWrapper asyncActiveLeave() {
+        return getPlanItemInstancesWithState(PlanItemInstanceState.ASYNC_ACTIVE_LEAVE);
     }
 
     public PlanItemInstancesWrapper onlyTerminal() {

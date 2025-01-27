@@ -12,6 +12,7 @@
  */
 package org.flowable.variable.service.impl.persistence.entity;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,8 @@ public interface HistoricVariableInstanceEntityManager extends EntityManager<His
     HistoricVariableInstanceEntity create(VariableInstanceEntity variableInstance, Date createTime);
 
     HistoricVariableInstanceEntity createAndInsert(VariableInstanceEntity variableInstance, Date createTime);
+
+    void copyVariableFields(HistoricVariableInstanceEntity historicVariableInstance, VariableInstanceEntity variableInstance, Date updateTime);
 
     void copyVariableValue(HistoricVariableInstanceEntity historicVariableInstance, VariableInstanceEntity variableInstance, Date updateTime);
 
@@ -52,6 +55,12 @@ public interface HistoricVariableInstanceEntityManager extends EntityManager<His
     void deleteHistoricVariableInstancesByTaskId(String taskId);
 
     void deleteHistoricVariableInstanceByProcessInstanceId(String historicProcessInstanceId);
+    
+    void bulkDeleteHistoricVariableInstancesByProcessInstanceIds(Collection<String> processInstanceIds);
+    
+    void bulkDeleteHistoricVariableInstancesByTaskIds(Collection<String> taskIds);
+    
+    void bulkDeleteHistoricVariableInstancesByScopeIdsAndScopeType(Collection<String> scopeIds, String scopeType);
 
     void deleteHistoricVariableInstancesForNonExistingProcessInstances();
     

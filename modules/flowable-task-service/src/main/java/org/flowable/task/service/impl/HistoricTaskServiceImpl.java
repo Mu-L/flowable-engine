@@ -12,6 +12,7 @@
  */
 package org.flowable.task.service.impl;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -56,6 +57,11 @@ public class HistoricTaskServiceImpl extends CommonServiceImpl<TaskServiceConfig
     @Override
     public List<HistoricTaskInstanceEntity> findHistoricTasksByParentTaskId(String parentTaskId) {
         return getHistoricTaskInstanceEntityManager().findHistoricTasksByParentTaskId(parentTaskId);
+    }
+
+    @Override
+    public List<String> findHistoricTaskIdsByParentTaskIds(Collection<String> parentTaskIds) {
+        return getHistoricTaskInstanceEntityManager().findHistoricTaskIdsByParentTaskIds(parentTaskIds);
     }
 
     @Override
@@ -114,8 +120,10 @@ public class HistoricTaskServiceImpl extends CommonServiceImpl<TaskServiceConfig
     public HistoricTaskInstanceEntity recordTaskInfoChange(TaskEntity taskEntity, Date changeTime, AbstractEngineConfiguration engineConfiguration) {
         HistoricTaskInstanceEntity historicTaskInstance = getHistoricTaskInstanceEntityManager().findById(taskEntity.getId());
         if (historicTaskInstance != null) {
+            historicTaskInstance.setState(taskEntity.getState());
             historicTaskInstance.setName(taskEntity.getName());
             historicTaskInstance.setDescription(taskEntity.getDescription());
+            historicTaskInstance.setInProgressStartDueDate(taskEntity.getInProgressStartDueDate());
             historicTaskInstance.setDueDate(taskEntity.getDueDate());
             historicTaskInstance.setPriority(taskEntity.getPriority());
             historicTaskInstance.setCategory(taskEntity.getCategory());
@@ -123,7 +131,12 @@ public class HistoricTaskServiceImpl extends CommonServiceImpl<TaskServiceConfig
             historicTaskInstance.setParentTaskId(taskEntity.getParentTaskId());
             historicTaskInstance.setTaskDefinitionKey(taskEntity.getTaskDefinitionKey());
             historicTaskInstance.setProcessDefinitionId(taskEntity.getProcessDefinitionId());
+            historicTaskInstance.setInProgressStartTime(taskEntity.getInProgressStartTime());
+            historicTaskInstance.setInProgressStartedBy(taskEntity.getInProgressStartedBy());
             historicTaskInstance.setClaimTime(taskEntity.getClaimTime());
+            historicTaskInstance.setClaimedBy(taskEntity.getClaimedBy());
+            historicTaskInstance.setSuspendedTime(taskEntity.getSuspendedTime());
+            historicTaskInstance.setSuspendedBy(taskEntity.getSuspendedBy());
             historicTaskInstance.setLastUpdateTime(changeTime);
 
             if (!Objects.equals(historicTaskInstance.getAssignee(), taskEntity.getAssignee())) {
@@ -200,6 +213,13 @@ public class HistoricTaskServiceImpl extends CommonServiceImpl<TaskServiceConfig
     }
     
     @Override
+    public void bulkDeleteHistoricTaskLogEntriesForTaskIds(Collection<String> taskIds) {
+        if (this.configuration.isEnableHistoricTaskLogging()) {
+            getHistoricTaskLogEntryEntityManager().bulkDeleteHistoricTaskLogEntriesForTaskIds(taskIds);
+        }
+    }
+    
+    @Override
     public void deleteHistoricTaskLogEntriesForNonExistingProcessInstances() {
         if (this.configuration.isEnableHistoricTaskLogging()) {
             getHistoricTaskLogEntryEntityManager().deleteHistoricTaskLogEntriesForNonExistingProcessInstances();
@@ -217,7 +237,12 @@ public class HistoricTaskServiceImpl extends CommonServiceImpl<TaskServiceConfig
     public void deleteHistoricTaskInstances(HistoricTaskInstanceQueryImpl historicTaskInstanceQuery) {
         getHistoricTaskInstanceEntityManager().deleteHistoricTaskInstances(historicTaskInstanceQuery);
     }
-    
+
+    @Override
+    public void bulkDeleteHistoricTaskInstances(Collection<String> taskIds) {
+        getHistoricTaskInstanceEntityManager().bulkDeleteHistoricTaskInstancesForIds(taskIds);
+    }
+
     @Override
     public void deleteHistoricTaskInstancesForNonExistingProcessInstances() {
         getHistoricTaskInstanceEntityManager().deleteHistoricTaskInstancesForNonExistingProcessInstances();

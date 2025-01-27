@@ -70,7 +70,7 @@ public class EventRegistryEventListenerActivityBehaviour extends CoreCmmnTrigger
         }
 
         if (key == null) {
-            throw new FlowableException("Could not resolve key from expression: " + eventDefinitionKeyExpression);
+            throw new FlowableException("Could not resolve key from expression: " + eventDefinitionKeyExpression + " for " + planItemInstanceEntity);
         }
 
         return key.toString();
@@ -86,13 +86,12 @@ public class EventRegistryEventListenerActivityBehaviour extends CoreCmmnTrigger
         RepetitionRule repetitionRule = ExpressionUtil.getRepetitionRule(planItemInstanceEntity);
         if (repetitionRule != null && ExpressionUtil.evaluateRepetitionRule(commandContext, planItemInstanceEntity, planItemInstanceEntity.getStagePlanItemInstanceEntity())) {
             PlanItemInstanceEntity eventPlanItemInstanceEntity = PlanItemInstanceUtil.copyAndInsertPlanItemInstance(commandContext, planItemInstanceEntity, false, false);
-            eventPlanItemInstanceEntity.setState(PlanItemInstanceState.AVAILABLE);
             CmmnEngineAgenda agenda = CommandContextUtil.getAgenda(commandContext);
             agenda.planCreatePlanItemInstanceWithoutEvaluationOperation(eventPlanItemInstanceEntity);
             agenda.planOccurPlanItemInstanceOperation(eventPlanItemInstanceEntity);
             
             CommandContextUtil.getCmmnEngineConfiguration(commandContext).getListenerNotificationHelper().executeLifecycleListeners(
-                    commandContext, planItemInstanceEntity, null, PlanItemInstanceState.AVAILABLE);
+                    commandContext, planItemInstanceEntity, PlanItemInstanceState.ACTIVE, PlanItemInstanceState.AVAILABLE);
             
         } else {
             CmmnEngineConfiguration cmmnEngineConfiguration = CommandContextUtil.getCmmnEngineConfiguration(commandContext);

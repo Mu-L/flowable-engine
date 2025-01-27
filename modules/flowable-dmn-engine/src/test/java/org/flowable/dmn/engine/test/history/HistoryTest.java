@@ -15,10 +15,12 @@ package org.flowable.dmn.engine.test.history;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Date;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 import java.util.List;
 
 import org.flowable.dmn.api.DmnHistoricDecisionExecution;
+import org.flowable.dmn.engine.impl.persistence.entity.HistoricDecisionExecutionEntity;
 import org.flowable.dmn.engine.impl.test.PluggableFlowableDmnTestCase;
 import org.flowable.dmn.engine.test.DmnDeployment;
 
@@ -274,34 +276,41 @@ public class HistoryTest extends PluggableFlowableDmnTestCase {
         DmnHistoricDecisionExecution decisionExecution = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").singleResult();
         String firstDecisionExecutionId = decisionExecution.getId();
 
-        dmnEngineConfiguration.getClock().setCurrentTime(new Date(new Date().getTime() + 2000L));
-
-        ruleService.createExecuteDecisionBuilder()
-                .decisionKey("decision1")
-                .variable("inputVariable1", 11)
-                .executeWithSingleResult();
-
-        List<DmnHistoricDecisionExecution> historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").list();
-        assertThat(historicExecutions).hasSize(2);
-
-        String secondDecisionExcecutionId = null;
-        for (DmnHistoricDecisionExecution historicDecisionExecution : historicExecutions) {
-            if (!historicDecisionExecution.getId().equals(firstDecisionExecutionId)) {
-                secondDecisionExcecutionId = historicDecisionExecution.getId();
+        try {
+            Calendar nextCal = new GregorianCalendar();
+            nextCal.add(Calendar.DATE, 2);
+            dmnEngineConfiguration.getClock().setCurrentTime(nextCal.getTime());
+    
+            ruleService.createExecuteDecisionBuilder()
+                    .decisionKey("decision1")
+                    .variable("inputVariable1", 11)
+                    .executeWithSingleResult();
+    
+            List<DmnHistoricDecisionExecution> historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").list();
+            assertThat(historicExecutions).hasSize(2);
+    
+            String secondDecisionExcecutionId = null;
+            for (DmnHistoricDecisionExecution historicDecisionExecution : historicExecutions) {
+                if (!historicDecisionExecution.getId().equals(firstDecisionExecutionId)) {
+                    secondDecisionExcecutionId = historicDecisionExecution.getId();
+                }
             }
+    
+            assertThat(secondDecisionExcecutionId).isNotNull();
+    
+            historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").orderByStartTime().asc().list();
+            assertThat(historicExecutions)
+                    .extracting(DmnHistoricDecisionExecution::getId)
+                    .containsExactly(firstDecisionExecutionId, secondDecisionExcecutionId);
+    
+            historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").orderByStartTime().desc().list();
+            assertThat(historicExecutions)
+                    .extracting(DmnHistoricDecisionExecution::getId)
+                    .containsExactly(secondDecisionExcecutionId, firstDecisionExecutionId);
+            
+        } finally {
+            dmnEngineConfiguration.getClock().reset();
         }
-
-        assertThat(secondDecisionExcecutionId).isNotNull();
-
-        historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").orderByStartTime().asc().list();
-        assertThat(historicExecutions)
-                .extracting(DmnHistoricDecisionExecution::getId)
-                .containsExactly(firstDecisionExecutionId, secondDecisionExcecutionId);
-
-        historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").orderByStartTime().desc().list();
-        assertThat(historicExecutions)
-                .extracting(DmnHistoricDecisionExecution::getId)
-                .containsExactly(secondDecisionExcecutionId, firstDecisionExecutionId);
     }
     
     @DmnDeployment
@@ -314,34 +323,41 @@ public class HistoryTest extends PluggableFlowableDmnTestCase {
         DmnHistoricDecisionExecution decisionExecution = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").singleResult();
         String firstDecisionExecutionId = decisionExecution.getId();
 
-        dmnEngineConfiguration.getClock().setCurrentTime(new Date(new Date().getTime() + 2000L));
+        try {
+            Calendar nextCal = new GregorianCalendar();
+            nextCal.add(Calendar.DATE, 2);
+            dmnEngineConfiguration.getClock().setCurrentTime(nextCal.getTime());
 
-        ruleService.createExecuteDecisionBuilder()
-                .decisionKey("decision1")
-                .variable("inputVariable1", 11)
-                .executeWithSingleResult();
-
-        List<DmnHistoricDecisionExecution> historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").list();
-        assertThat(historicExecutions).hasSize(2);
-
-        String secondDecisionExcecutionId = null;
-        for (DmnHistoricDecisionExecution historicDecisionExecution : historicExecutions) {
-            if (!historicDecisionExecution.getId().equals(firstDecisionExecutionId)) {
-                secondDecisionExcecutionId = historicDecisionExecution.getId();
+            ruleService.createExecuteDecisionBuilder()
+                    .decisionKey("decision1")
+                    .variable("inputVariable1", 11)
+                    .executeWithSingleResult();
+    
+            List<DmnHistoricDecisionExecution> historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").list();
+            assertThat(historicExecutions).hasSize(2);
+    
+            String secondDecisionExcecutionId = null;
+            for (DmnHistoricDecisionExecution historicDecisionExecution : historicExecutions) {
+                if (!historicDecisionExecution.getId().equals(firstDecisionExecutionId)) {
+                    secondDecisionExcecutionId = historicDecisionExecution.getId();
+                }
             }
+    
+            assertThat(secondDecisionExcecutionId).isNotNull();
+    
+            historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").orderByStartTime().asc().listPage(0, 10);
+            assertThat(historicExecutions)
+                    .extracting(DmnHistoricDecisionExecution::getId)
+                    .containsExactly(firstDecisionExecutionId, secondDecisionExcecutionId);
+    
+            historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").orderByStartTime().desc().listPage(0, 10);
+            assertThat(historicExecutions)
+                    .extracting(DmnHistoricDecisionExecution::getId)
+                    .containsExactly(secondDecisionExcecutionId, firstDecisionExecutionId);
+            
+        } finally {
+            dmnEngineConfiguration.getClock().reset();
         }
-
-        assertThat(secondDecisionExcecutionId).isNotNull();
-
-        historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").orderByStartTime().asc().listPage(0, 10);
-        assertThat(historicExecutions)
-                .extracting(DmnHistoricDecisionExecution::getId)
-                .containsExactly(firstDecisionExecutionId, secondDecisionExcecutionId);
-
-        historicExecutions = historyService.createHistoricDecisionExecutionQuery().decisionKey("decision1").orderByStartTime().desc().listPage(0, 10);
-        assertThat(historicExecutions)
-                .extracting(DmnHistoricDecisionExecution::getId)
-                .containsExactly(secondDecisionExcecutionId, firstDecisionExecutionId);
     }
 
     @DmnDeployment
@@ -366,6 +382,50 @@ public class HistoryTest extends PluggableFlowableDmnTestCase {
         assertThat(executionNode.get("decisionKey").asText()).isEqualTo("expandedDecisionService");
 
         JsonNode decisionServiceResult =  executionNode.get("decisionServiceResult");
+        assertThat(decisionServiceResult.get("decision1").isArray()).isTrue();
+        assertThat(decisionServiceResult.get("decision2").isArray()).isTrue();
+
+        assertThat(decisionServiceResult.get("decision1")).hasSize(3);
+        assertThat(decisionServiceResult.get("decision2")).hasSize(3);
+
+        JsonNode decisionResultArray = executionNode.get("decisionResult");
+        assertThat(decisionResultArray.isArray()).isTrue();
+        assertThat(decisionResultArray).isEmpty();
+
+        JsonNode ruleExecutions = executionNode.get("childDecisionExecutions");
+        assertThat(ruleExecutions.isObject()).isTrue();
+        assertThat(ruleExecutions.has("decision4")).isTrue();
+        assertThat(ruleExecutions.has("decision3")).isTrue();
+        assertThat(ruleExecutions.has("decision1")).isTrue();
+        assertThat(ruleExecutions.has("decision2")).isTrue();
+    }
+
+    @DmnDeployment(resources = "org/flowable/dmn/engine/test/history/HistoryTest.testHistoricDecisionService.dmn")
+    public void testHistoricDecisionServiceNativeQuery() throws Exception {
+        ruleService.createExecuteDecisionBuilder()
+                .decisionKey("expandedDecisionService")
+                .variable("input1", "test1")
+                .variable("input2", "test2")
+                .variable("input3", "test3")
+                .variable("input4", "test4")
+                .executeWithAuditTrail();
+
+        List<DmnHistoricDecisionExecution> decisionExecutions = historyService.createNativeHistoricDecisionExecutionQuery()
+                .sql("SELECT * FROM " + managementService.getTableName(HistoricDecisionExecutionEntity.class)).list();
+
+        assertThat(decisionExecutions.size()).isEqualTo(1);
+        DmnHistoricDecisionExecution decisionExecution = decisionExecutions.get(0);
+        assertThat(decisionExecution.getDecisionDefinitionId()).isNotNull();
+        assertThat(decisionExecution.getDeploymentId()).isNotNull();
+        assertThat(decisionExecution.isFailed()).isFalse();
+        assertThat(decisionExecution.getStartTime()).isNotNull();
+        assertThat(decisionExecution.getEndTime()).isNotNull();
+        assertThat(decisionExecution.getExecutionJson()).isNotNull();
+
+        JsonNode executionNode = dmnEngineConfiguration.getObjectMapper().readTree(decisionExecution.getExecutionJson());
+        assertThat(executionNode.get("decisionKey").asText()).isEqualTo("expandedDecisionService");
+
+        JsonNode decisionServiceResult = executionNode.get("decisionServiceResult");
         assertThat(decisionServiceResult.get("decision1").isArray()).isTrue();
         assertThat(decisionServiceResult.get("decision2").isArray()).isTrue();
 

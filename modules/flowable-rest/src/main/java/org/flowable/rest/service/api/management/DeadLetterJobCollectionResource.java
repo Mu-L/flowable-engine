@@ -15,9 +15,8 @@ package org.flowable.rest.service.api.management;
 
 import static org.flowable.common.rest.api.PaginateListUtil.paginateList;
 
+import java.util.Arrays;
 import java.util.Map;
-
-import javax.servlet.http.HttpServletRequest;
 
 import org.flowable.common.engine.api.FlowableIllegalArgumentException;
 import org.flowable.common.rest.api.DataResponse;
@@ -65,6 +64,8 @@ public class DeadLetterJobCollectionResource {
             @ApiImplicitParam(name = "processDefinitionId", dataType = "string", value = "Only return jobs with the given process definition id", paramType = "query"),
             @ApiImplicitParam(name = "elementId", dataType = "string", value = "Only return jobs with the given element id", paramType = "query"),
             @ApiImplicitParam(name = "elementName", dataType = "string", value = "Only return jobs with the given element name", paramType = "query"),
+            @ApiImplicitParam(name = "handlerType", dataType = "string", value = "Only return jobs with the given handler type", paramType = "query"),
+            @ApiImplicitParam(name = "handlerTypes", dataType = "string", value = "Only return jobs which have one of the given job handler type", paramType = "query"),
             @ApiImplicitParam(name = "executable", dataType = "boolean", value = "If true, only return jobs which are executable. If false, this parameter is ignored.", paramType = "query"),
             @ApiImplicitParam(name = "timersOnly", dataType = "boolean", value = "If true, only return jobs which are timers. If false, this parameter is ignored. Cannot be used together with 'messagesOnly'.", paramType = "query"),
             @ApiImplicitParam(name = "messagesOnly", dataType = "boolean", value = "If true, only return jobs which are messages. If false, this parameter is ignored. Cannot be used together with 'timersOnly'", paramType = "query"),
@@ -86,7 +87,7 @@ public class DeadLetterJobCollectionResource {
             @ApiResponse(code = 400, message = "Indicates an illegal value has been used in a url query parameter or the both 'messagesOnly' and 'timersOnly' are used as parameters. Status description contains additional details about the error.")
     })
     @GetMapping(value = "/management/deadletter-jobs", produces = "application/json")
-    public DataResponse<JobResponse> getJobs(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<JobResponse> getJobs(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         DeadLetterJobQuery query = managementService.createDeadLetterJobQuery();
 
         if (allRequestParams.containsKey("id")) {
@@ -95,7 +96,7 @@ public class DeadLetterJobCollectionResource {
         if (allRequestParams.containsKey("processInstanceId")) {
             query.processInstanceId(allRequestParams.get("processInstanceId"));
         }
-        if (allRequestParams.containsKey("withoutProcessInstanceId") && Boolean.valueOf(allRequestParams.get("withoutProcessInstanceId"))) {
+        if (allRequestParams.containsKey("withoutProcessInstanceId") && Boolean.parseBoolean(allRequestParams.get("withoutProcessInstanceId"))) {
             query.withoutProcessInstanceId();
         }
         if (allRequestParams.containsKey("executionId")) {
@@ -110,6 +111,12 @@ public class DeadLetterJobCollectionResource {
         if (allRequestParams.containsKey("elementName")) {
             query.elementName(allRequestParams.get("elementName"));
         }
+        if (allRequestParams.containsKey("handlerType")) {
+            query.handlerType(allRequestParams.get("handlerType"));
+        }
+        if (allRequestParams.containsKey("handlerTypes")) {
+            query.handlerTypes(Arrays.asList(allRequestParams.get("handlerTypes").split(",")));
+        }
         if (allRequestParams.containsKey("executable")) {
             query.executable();
         }
@@ -117,11 +124,11 @@ public class DeadLetterJobCollectionResource {
             if (allRequestParams.containsKey("messagesOnly")) {
                 throw new FlowableIllegalArgumentException("Only one of 'timersOnly' or 'messagesOnly' can be provided.");
             }
-            if (Boolean.valueOf(allRequestParams.get("timersOnly"))) {
+            if (Boolean.parseBoolean(allRequestParams.get("timersOnly"))) {
                 query.timers();
             }
         }
-        if (allRequestParams.containsKey("messagesOnly") && Boolean.valueOf(allRequestParams.get("messagesOnly"))) {
+        if (allRequestParams.containsKey("messagesOnly") && Boolean.parseBoolean(allRequestParams.get("messagesOnly"))) {
             query.messages();
         }
         if (allRequestParams.containsKey("dueBefore")) {
@@ -130,7 +137,7 @@ public class DeadLetterJobCollectionResource {
         if (allRequestParams.containsKey("dueAfter")) {
             query.duedateHigherThan(RequestUtil.getDate(allRequestParams, "dueAfter"));
         }
-        if (allRequestParams.containsKey("withException") && Boolean.valueOf(allRequestParams.get("withException"))) {
+        if (allRequestParams.containsKey("withException") && Boolean.parseBoolean(allRequestParams.get("withException"))) {
             query.withException();
         }
         if (allRequestParams.containsKey("exceptionMessage")) {
@@ -142,13 +149,13 @@ public class DeadLetterJobCollectionResource {
         if (allRequestParams.containsKey("tenantIdLike")) {
             query.jobTenantIdLike(allRequestParams.get("tenantIdLike"));
         }
-        if (allRequestParams.containsKey("withoutTenantId") && Boolean.valueOf(allRequestParams.get("withoutTenantId"))) {
+        if (allRequestParams.containsKey("withoutTenantId") && Boolean.parseBoolean(allRequestParams.get("withoutTenantId"))) {
             query.jobWithoutTenantId();
         }
-        if (allRequestParams.containsKey("withoutScopeType") && Boolean.valueOf(allRequestParams.get("withoutScopeType"))) {
+        if (allRequestParams.containsKey("withoutScopeType") && Boolean.parseBoolean(allRequestParams.get("withoutScopeType"))) {
             query.withoutScopeType();
         }
-        if (allRequestParams.containsKey("withoutScopeId") && Boolean.valueOf(allRequestParams.get("withoutScopeId"))) {
+        if (allRequestParams.containsKey("withoutScopeId") && Boolean.parseBoolean(allRequestParams.get("withoutScopeId"))) {
             query.withoutScopeId();
         }
         

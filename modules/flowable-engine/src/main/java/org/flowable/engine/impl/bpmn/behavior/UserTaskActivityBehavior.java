@@ -1,9 +1,9 @@
 /* Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -12,6 +12,10 @@
  */
 package org.flowable.engine.impl.bpmn.behavior;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -34,9 +38,11 @@ import org.flowable.common.engine.impl.interceptor.CommandContext;
 import org.flowable.common.engine.impl.logging.LoggingSessionConstants;
 import org.flowable.common.engine.impl.logging.LoggingSessionUtil;
 import org.flowable.engine.DynamicBpmnConstants;
+import org.flowable.engine.delegate.BpmnError;
 import org.flowable.engine.delegate.DelegateExecution;
 import org.flowable.engine.delegate.TaskListener;
 import org.flowable.engine.impl.bpmn.helper.DynamicPropertyUtil;
+import org.flowable.engine.impl.bpmn.helper.ErrorPropagation;
 import org.flowable.engine.impl.bpmn.helper.SkipExpressionUtil;
 import org.flowable.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.flowable.engine.impl.context.BpmnOverrideContext;
@@ -134,6 +140,9 @@ public class UserTaskActivityBehavior extends TaskActivityBehavior implements Ac
             activeTaskCandidateGroups = userTask.getCandidateGroups();
             activeTaskIdVariableName = userTask.getTaskIdVariableName();
         }
+        if (execution.getCurrentActivityName() != null) {
+            activeTaskName = execution.getCurrentActivityName();
+        }
         
         CreateUserTaskBeforeContext beforeContext = new CreateUserTaskBeforeContext(userTask, execution, activeTaskName, activeTaskDescription, activeTaskDueDate, 
                         activeTaskPriority, activeTaskCategory, activeTaskFormKey, activeTaskSkipExpression, activeTaskAssignee, activeTaskOwner, 
@@ -170,7 +179,12 @@ public class UserTaskActivityBehavior extends TaskActivityBehavior implements Ac
                 processEngineConfiguration.getCreateUserTaskInterceptor().afterCreateUserTask(afterContext);
             }
 
-            processEngineConfiguration.getListenerNotificationHelper().executeTaskListeners(task, TaskListener.EVENTNAME_CREATE);
+            try {
+                processEngineConfiguration.getListenerNotificationHelper().executeTaskListeners(task, TaskListener.EVENTNAME_CREATE);
+            } catch (BpmnError bpmnError) {
+                ErrorPropagation.propagateError(bpmnError, execution);
+                return;
+            }
 
             // All properties set, now firing 'create' events
             FlowableEventDispatcher eventDispatcher = processEngineConfiguration.getTaskServiceConfiguration().getEventDispatcher();
@@ -244,9 +258,16 @@ public class UserTaskActivityBehavior extends TaskActivityBehavior implements Ac
                     BusinessCalendar businessCalendar = processEngineConfiguration.getBusinessCalendarManager()
                             .getBusinessCalendar(businessCalendarName);
                     task.setDueDate(businessCalendar.resolveDuedate((String) dueDate));
-
+                } else if (dueDate instanceof Instant) {
+                    task.setDueDate(Date.from((Instant) dueDate));
+                } else if (dueDate instanceof LocalDate) {
+                    Date localDueDate = Date.from(((LocalDate) dueDate).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant());
+                    task.setDueDate(localDueDate);
+                } else if (dueDate instanceof LocalDateTime) {
+                    Date localDueDate = Date.from(((LocalDateTime) dueDate).atZone(ZoneId.systemDefault()).toInstant());
+                    task.setDueDate(localDueDate);
                 } else {
-                    throw new FlowableIllegalArgumentException("Due date expression does not resolve to a Date or Date string: " + activeTaskDueDate);
+                    throw new FlowableIllegalArgumentException("Due date expression does not resolve to a Date, Instant, LocalDate, LocalDateTime or Date string: " + beforeContext.getDueDate());
                 }
             }
         }
@@ -312,7 +333,7 @@ public class UserTaskActivityBehavior extends TaskActivityBehavior implements Ac
                 .findTasksByExecutionId(execution.getId()); // Should be only one
         for (TaskEntity taskEntity : taskEntities) {
             if (!taskEntity.isDeleted()) {
-                throw new FlowableException("UserTask should not be signalled before complete");
+                throw new FlowableException("UserTask should not be signalled before complete for " + taskEntity);
             }
         }
 

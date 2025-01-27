@@ -36,8 +36,8 @@ create table ACT_HI_ACTINST (
     CALL_PROC_INST_ID_ varchar(64),
     ACT_NAME_ varchar(255),
     ACT_TYPE_ varchar(255) not null,
-    OWNER_ varchar(64),
     ASSIGNEE_ varchar(255),
+    COMPLETED_BY_ varchar(255),
     START_TIME_ timestamp not null,
     END_TIME_ timestamp,
     TRANSACTION_ORDER_ integer,
@@ -96,6 +96,7 @@ create table ACT_HI_ATTACHMENT (
 
 create index ACT_IDX_HI_PRO_INST_END on ACT_HI_PROCINST(END_TIME_);
 create index ACT_IDX_HI_PRO_I_BUSKEY on ACT_HI_PROCINST(BUSINESS_KEY_);
+create index ACT_IDX_HI_PRO_SUPER_PROCINST on ACT_HI_PROCINST(SUPER_PROCESS_INSTANCE_ID_);
 create index ACT_IDX_HI_ACT_INST_START on ACT_HI_ACTINST(START_TIME_);
 create index ACT_IDX_HI_ACT_INST_END on ACT_HI_ACTINST(END_TIME_);
 create index ACT_IDX_HI_DETAIL_PROC_INST on ACT_HI_DETAIL(PROC_INST_ID_);

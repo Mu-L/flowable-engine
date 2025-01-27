@@ -15,9 +15,8 @@ package org.flowable.eventregistry.rest.service.api.repository;
 
 import java.util.List;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
-import org.apache.http.entity.ContentType;
 import org.flowable.common.engine.api.FlowableObjectNotFoundException;
 import org.flowable.common.rest.resolver.ContentTypeResolver;
 import org.flowable.eventregistry.api.EventDeployment;
@@ -80,13 +79,8 @@ public class DeploymentResourceResource extends BaseDeploymentResource {
 
         if (resourceList.contains(resourceName)) {
             // Build resource representation
-            String contentType = null;
-            if (resourceName.toLowerCase().endsWith(".event") || resourceName.toLowerCase().endsWith(".channel")) {
-                contentType = ContentType.APPLICATION_JSON.getMimeType();
-            } else {
-                contentType = contentTypeResolver.resolveContentType(resourceName);
-            }
-            
+            String contentType = contentTypeResolver.resolveContentType(resourceName);
+
             DeploymentResourceResponse response = restResponseFactory.createDeploymentResourceResponse(deploymentId, resourceName, contentType);
             return response;
 

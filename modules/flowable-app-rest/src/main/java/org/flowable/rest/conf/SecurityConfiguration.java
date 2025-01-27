@@ -12,6 +12,8 @@
  */
 package org.flowable.rest.conf;
 
+import static org.springframework.security.web.util.matcher.AntPathRequestMatcher.antMatcher;
+
 import org.apache.commons.lang3.StringUtils;
 import org.flowable.rest.app.properties.RestAppProperties;
 import org.flowable.rest.security.BasicAuthenticationProvider;
@@ -22,14 +24,16 @@ import org.springframework.boot.actuate.info.InfoEndpoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
 
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
+public class SecurityConfiguration {
     
     protected final RestAppProperties restAppProperties;
 
@@ -44,13 +48,11 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
         return basicAuthenticationProvider;
     }
     
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        HttpSecurity httpSecurity = http.authenticationProvider(authenticationProvider())
-                .sessionManagement()
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                .and()
-                .csrf().disable();
+    @Bean
+    public SecurityFilterChain restApiSecurity(HttpSecurity http, AuthenticationProvider authenticationProvider) throws Exception {
+        HttpSecurity httpSecurity = http.authenticationProvider(authenticationProvider)
+                .sessionManagement(sessionManagement -> sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(CsrfConfigurer::disable);
 
         if (restAppProperties.getCors().isEnabled()) {
             httpSecurity.apply(new PropertyBasedCorsFilter(restAppProperties));
@@ -59,34 +61,35 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
         // Swagger docs
         if (isSwaggerDocsEnabled()) {
             httpSecurity
-                .authorizeRequests()
-                .antMatchers("/docs/**").permitAll();
+                .authorizeHttpRequests(authorizeRequests -> authorizeRequests.requestMatchers(antMatcher("/docs/**")).permitAll());
 
         } else {
             httpSecurity
-                .authorizeRequests()
-                .antMatchers("/docs/**").denyAll();
+                .authorizeHttpRequests(authorizeRequests -> authorizeRequests.requestMatchers(antMatcher("/docs/**")).denyAll());
             
         }
 
         httpSecurity
-            .authorizeRequests()
-            .requestMatchers(EndpointRequest.to(InfoEndpoint.class, HealthEndpoint.class)).authenticated()
-            .requestMatchers(EndpointRequest.toAnyEndpoint()).hasAnyAuthority(SecurityConstants.ACCESS_ADMIN);
+            .authorizeHttpRequests(authorizeRequests ->
+                authorizeRequests
+                        .requestMatchers(EndpointRequest.to(InfoEndpoint.class, HealthEndpoint.class)).authenticated()
+                        .requestMatchers(EndpointRequest.toAnyEndpoint()).hasAnyAuthority(SecurityConstants.ACCESS_ADMIN)
+            );
+
 
         // Rest API access
         if (isVerifyRestApiPrivilege()) {
             httpSecurity
-                .authorizeRequests()
-                .anyRequest()
-                .hasAuthority(SecurityConstants.PRIVILEGE_ACCESS_REST_API).and ().httpBasic();
+                .authorizeHttpRequests(authorizeRequests -> authorizeRequests.anyRequest().hasAuthority(SecurityConstants.PRIVILEGE_ACCESS_REST_API));
             
         } else {
             httpSecurity
-            .authorizeRequests()
-            .anyRequest()
-            .authenticated().and().httpBasic();
+            .authorizeHttpRequests(authorizeRequests -> authorizeRequests.anyRequest().authenticated());
         }
+
+        httpSecurity.httpBasic(Customizer.withDefaults());
+
+        return http.build();
     }
     
     protected boolean isVerifyRestApiPrivilege() {

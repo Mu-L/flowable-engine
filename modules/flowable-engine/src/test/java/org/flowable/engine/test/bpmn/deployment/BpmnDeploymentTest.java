@@ -235,7 +235,7 @@ public class BpmnDeploymentTest extends PluggableFlowableTestCase {
             // Graphical information is not yet exposed publicly, so we need to
             // do some plumbing
             CommandExecutor commandExecutor = processEngineConfiguration.getCommandExecutor();
-            ProcessDefinition processDefinition = commandExecutor.execute(new Command<ProcessDefinition>() {
+            ProcessDefinition processDefinition = commandExecutor.execute(new Command<>() {
                 @Override
                 public ProcessDefinition execute(CommandContext commandContext) {
                     return Context.getProcessEngineConfiguration().getDeploymentManager().findDeployedLatestProcessDefinitionByKey("myProcess");
@@ -335,6 +335,19 @@ public class BpmnDeploymentTest extends PluggableFlowableTestCase {
                         .deploy())
                 .isExactlyInstanceOf(FlowableException.class)
                 .as("Expected deployment exception because v5 compatibility handler is not enabled");
+    }
+
+    @Test
+    public void deployingModelWithEmptyCDATAShouldNotFail() {
+        org.flowable.engine.repository.Deployment deployment = repositoryService.createDeployment()
+                .addClasspathResource("org/flowable/engine/test/bpmn/deployment/BpmnDeploymentTest.testBpmnWithEmptyCDATA.bpmn20.xml")
+                .deploy();
+        deploymentIdsForAutoCleanup.add(deployment.getId());
+
+        ProcessDefinition definition = repositoryService.createProcessDefinitionQuery()
+                .processDefinitionKey("myProcess")
+                .singleResult();
+        assertThat(definition).isNotNull();
     }
 
 }

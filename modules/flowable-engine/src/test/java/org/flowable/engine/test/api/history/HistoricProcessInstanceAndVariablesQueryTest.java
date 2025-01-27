@@ -223,7 +223,8 @@ public class HistoricProcessInstanceAndVariablesQueryTest extends PluggableFlowa
             assertThat(historyService.createHistoricProcessInstanceQuery().localVariableValueEquals("localVar", "test").list()).hasSize(1);
         }
     }
-    
+
+    @Test
     public void testQueryWithLocalVariables() {
         String processInstanceId = processInstanceIds.get(processInstanceIds.size() - 1);
         Execution execution = runtimeService.createExecutionQuery().processInstanceId(processInstanceId).onlyChildExecutions().singleResult();
@@ -540,9 +541,9 @@ public class HistoricProcessInstanceAndVariablesQueryTest extends PluggableFlowa
             // ProcessDefinitionCategory
             processInstance = historyService.createHistoricProcessInstanceQuery().includeProcessVariables()
                     .or().variableValueEquals("anothertest", "invalid").processDefinitionCategory(PROCESS_DEFINITION_CATEGORY_2).endOr().singleResult();
-            variableMap = processInstance.getProcessVariables();
             assertThat(variableMap)
                     .containsExactly(entry("anothertest", 123));
+            assertThat(processInstance.getProcessDefinitionCategory()).isEqualTo(PROCESS_DEFINITION_CATEGORY_2);
 
             processInstance = historyService.createHistoricProcessInstanceQuery().includeProcessVariables()
                     .or().variableValueEquals("anothertest", "invalid").processDefinitionCategory("invalid").endOr().singleResult();

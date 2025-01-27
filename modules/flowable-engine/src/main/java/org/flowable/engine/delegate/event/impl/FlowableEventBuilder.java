@@ -368,7 +368,7 @@ public class FlowableEventBuilder {
         return newEvent;
     }
     
-    public static FlowableConditionalEvent createConditionalEvent(FlowableEngineEventType type, String activityId, String conditionExpression,
+    public static FlowableConditionalEvent createConditionalEvent(FlowableEngineEventType type, String activityId, String conditionExpression, String conditionLanguage,
                     String executionId, String processInstanceId, String processDefinitionId) {
         
         FlowableConditionalEventImpl newEvent = new FlowableConditionalEventImpl(type);
@@ -377,6 +377,7 @@ public class FlowableEventBuilder {
         newEvent.setProcessDefinitionId(processDefinitionId);
         newEvent.setProcessInstanceId(processInstanceId);
         newEvent.setConditionExpression(conditionExpression);
+        newEvent.setConditionLanguage(conditionLanguage);
         return newEvent;
     }
     
@@ -405,7 +406,7 @@ public class FlowableEventBuilder {
     }
 
     public static FlowableVariableEvent createVariableEvent(FlowableEngineEventType type, String variableName, Object variableValue, VariableType variableType, String taskId, String executionId,
-            String processInstanceId, String processDefinitionId) {
+            String processInstanceId, String processDefinitionId, String variableInstanceId) {
         FlowableVariableEventImpl newEvent = new FlowableVariableEventImpl(type);
         newEvent.setVariableName(variableName);
         newEvent.setVariableValue(variableValue);
@@ -414,6 +415,7 @@ public class FlowableEventBuilder {
         newEvent.setExecutionId(executionId);
         newEvent.setProcessDefinitionId(processDefinitionId);
         newEvent.setProcessInstanceId(processInstanceId);
+        newEvent.setVariableInstanceId(variableInstanceId);
         return newEvent;
     }
 

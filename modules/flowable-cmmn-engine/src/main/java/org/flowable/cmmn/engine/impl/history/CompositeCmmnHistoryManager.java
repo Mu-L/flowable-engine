@@ -96,6 +96,13 @@ public class CompositeCmmnHistoryManager implements CmmnHistoryManager {
     }
 
     @Override
+    public void recordBulkDeleteHistoricCaseInstances(Collection<String> caseInstanceIds) {
+        for (CmmnHistoryManager historyManager : historyManagers) {
+            historyManager.recordBulkDeleteHistoricCaseInstances(caseInstanceIds);
+        }
+    }
+
+    @Override
     public void recordIdentityLinkCreated(IdentityLinkEntity identityLink) {
         for (CmmnHistoryManager historyManager : historyManagers) {
             historyManager.recordIdentityLinkCreated(identityLink);
@@ -152,9 +159,9 @@ public class CompositeCmmnHistoryManager implements CmmnHistoryManager {
     }
 
     @Override
-    public void recordTaskEnd(TaskEntity task, String deleteReason, Date endTime) {
+    public void recordTaskEnd(TaskEntity task, String userId, String deleteReason, Date endTime) {
         for (CmmnHistoryManager historyManager : historyManagers) {
-            historyManager.recordTaskEnd(task, deleteReason, endTime);
+            historyManager.recordTaskEnd(task, userId, deleteReason, endTime);
         }
     }
 

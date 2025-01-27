@@ -76,6 +76,7 @@ public abstract class BaseBpmnXMLConverter implements BpmnXMLConstants {
 
     protected static final List<ExtensionAttribute> defaultActivityAttributes = Arrays.asList(
             new ExtensionAttribute(ATTRIBUTE_ACTIVITY_ASYNCHRONOUS),
+            new ExtensionAttribute(ATTRIBUTE_ACTIVITY_ASYNCHRONOUS_BEFORE),
             new ExtensionAttribute(ATTRIBUTE_ACTIVITY_EXCLUSIVE),
             new ExtensionAttribute(ATTRIBUTE_DEFAULT),
             new ExtensionAttribute(ATTRIBUTE_ACTIVITY_ISFORCOMPENSATION));
@@ -85,8 +86,10 @@ public abstract class BaseBpmnXMLConverter implements BpmnXMLConstants {
         String elementId = xtr.getAttributeValue(null, ATTRIBUTE_ID);
         String elementName = xtr.getAttributeValue(null, ATTRIBUTE_NAME);
         boolean async = parseAsync(xtr);
+        boolean asyncLeave = parsAsyncLeave(xtr);
         boolean triggerable = parseTriggerable(xtr);
         boolean notExclusive = parseNotExclusive(xtr);
+        boolean asyncLeaveNotExclusive = parseAsyncLeaveNotExclusive(xtr);
         String defaultFlow = xtr.getAttributeValue(null, ATTRIBUTE_DEFAULT);
         boolean isForCompensation = parseForCompensation(xtr);
 
@@ -108,13 +111,17 @@ public abstract class BaseBpmnXMLConverter implements BpmnXMLConstants {
 
             FlowElement currentFlowElement = (FlowElement) parsedElement;
             currentFlowElement.setId(elementId);
-            currentFlowElement.setName(elementName);
+            if (currentFlowElement.getName() == null) {
+                currentFlowElement.setName(elementName);
+            }
 
             if (currentFlowElement instanceof FlowNode) {
                 FlowNode flowNode = (FlowNode) currentFlowElement;
                 flowNode.setAsynchronous(async);
+                flowNode.setAsynchronousLeave(asyncLeave);
                 flowNode.setNotExclusive(notExclusive);
-
+                flowNode.setAsynchronousLeaveNotExclusive(asyncLeaveNotExclusive);
+                
                 if (currentFlowElement instanceof Activity) {
 
                     Activity activity = (Activity) currentFlowElement;
@@ -157,20 +164,30 @@ public abstract class BaseBpmnXMLConverter implements BpmnXMLConstants {
         }
     }
 
-    public void convertToXML(XMLStreamWriter xtw, BaseElement baseElement, BpmnModel model) throws Exception {
+    public void convertToXML(XMLStreamWriter xtw, BaseElement baseElement, BpmnModel model, BpmnXMLConverterOptions options) throws Exception {
         xtw.writeStartElement(getXMLElementName());
         boolean didWriteExtensionStartElement = false;
         writeDefaultAttribute(ATTRIBUTE_ID, baseElement.getId(), xtw);
         if (baseElement instanceof FlowElement) {
-            writeDefaultAttribute(ATTRIBUTE_NAME, ((FlowElement) baseElement).getName(), xtw);
+            String name = ((FlowElement) baseElement).getName();
+            if (!(options.isSaveElementNameWithNewLineInExtensionElement() && BpmnXMLUtil.containsNewLine(name))) {
+                writeDefaultAttribute(ATTRIBUTE_NAME, name, xtw);
+            }
         }
 
         if (baseElement instanceof FlowNode) {
             final FlowNode flowNode = (FlowNode) baseElement;
+
             if (flowNode.isAsynchronous()) {
                 writeQualifiedAttribute(ATTRIBUTE_ACTIVITY_ASYNCHRONOUS, ATTRIBUTE_VALUE_TRUE, xtw);
                 if (flowNode.isNotExclusive()) {
                     writeQualifiedAttribute(ATTRIBUTE_ACTIVITY_EXCLUSIVE, ATTRIBUTE_VALUE_FALSE, xtw);
+                }
+            }
+            if (flowNode.isAsynchronousLeave()) {
+                writeQualifiedAttribute(ATTRIBUTE_ACTIVITY_ASYNCHRONOUS_LEAVE, ATTRIBUTE_VALUE_TRUE, xtw);
+                if (flowNode.isAsynchronousLeaveNotExclusive()) {
+                    writeQualifiedAttribute(ATTRIBUTE_ACTIVITY_ASYNCHRONOUS_LEAVE_EXCLUSIVE, ATTRIBUTE_VALUE_FALSE, xtw); // shared with async
                 }
             }
 
@@ -207,6 +224,10 @@ public abstract class BaseBpmnXMLConverter implements BpmnXMLConstants {
                 xtw.writeStartElement(ELEMENT_DOCUMENTATION);
                 xtw.writeCharacters(flowElement.getDocumentation());
                 xtw.writeEndElement();
+            }
+
+            if (options.isSaveElementNameWithNewLineInExtensionElement()) {
+                didWriteExtensionStartElement = BpmnXMLUtil.writeElementNameExtensionElement(flowElement, didWriteExtensionStartElement, xtw);
             }
         }
 
@@ -302,6 +323,11 @@ public abstract class BaseBpmnXMLConverter implements BpmnXMLConstants {
     protected boolean parseAsync(XMLStreamReader xtr) {
         boolean async = false;
         String asyncString = BpmnXMLUtil.getAttributeValue(ATTRIBUTE_ACTIVITY_ASYNCHRONOUS, xtr);
+
+        if (asyncString == null) {
+            asyncString = xtr.getAttributeValue(CAMUNDA_EXTENSIONS_NAMESPACE, ATTRIBUTE_ACTIVITY_ASYNCHRONOUS_BEFORE);
+        }
+
         if (ATTRIBUTE_VALUE_TRUE.equalsIgnoreCase(asyncString)) {
             async = true;
         }
@@ -316,13 +342,27 @@ public abstract class BaseBpmnXMLConverter implements BpmnXMLConstants {
         }
         return notExclusive;
     }
+    
+    protected boolean parseAsyncLeaveNotExclusive(XMLStreamReader xtr) {
+        boolean notExclusive = false;
+        String exclusiveString = BpmnXMLUtil.getAttributeValue(ATTRIBUTE_ACTIVITY_ASYNCHRONOUS_LEAVE_EXCLUSIVE, xtr);
+        if (ATTRIBUTE_VALUE_FALSE.equalsIgnoreCase(exclusiveString)) {
+            notExclusive = true;
+        }
+        return notExclusive;
+    }
+
+    protected boolean parsAsyncLeave(XMLStreamReader xtr) {
+        String asyncLeaveString = BpmnXMLUtil.getAttributeValue(ATTRIBUTE_ACTIVITY_ASYNCHRONOUS_LEAVE, xtr);
+        if (StringUtils.isEmpty(asyncLeaveString)) {
+            asyncLeaveString = BpmnXMLUtil.getAttributeValue("asyncAfter", xtr);
+        }
+        return ATTRIBUTE_VALUE_TRUE.equalsIgnoreCase(asyncLeaveString);
+    }
 
     protected boolean parseTriggerable(XMLStreamReader xtr) {
         String triggerable = BpmnXMLUtil.getAttributeValue(ATTRIBUTE_ACTIVITY_TRIGGERABLE, xtr);
-        if (ATTRIBUTE_VALUE_TRUE.equalsIgnoreCase(triggerable)) {
-            return true;
-        }
-        return false;
+        return ATTRIBUTE_VALUE_TRUE.equalsIgnoreCase(triggerable);
     }
 
     protected boolean parseForCompensation(XMLStreamReader xtr) {
@@ -557,6 +597,10 @@ public abstract class BaseBpmnXMLConverter implements BpmnXMLConstants {
 
         if (StringUtils.isNotEmpty(conditionalDefinition.getConditionExpression())) {
             xtw.writeStartElement(ELEMENT_CONDITION);
+            if (conditionalDefinition.getConditionLanguage() != null) {
+                xtw.writeAttribute(XSI_PREFIX, XSI_NAMESPACE, "type", "tFormalExpression");
+                BpmnXMLUtil.writeDefaultAttribute(BpmnXMLConstants.ATTRIBUTE_SCRIPT_LANGUAGE, conditionalDefinition.getConditionLanguage(), xtw);
+            }
             xtw.writeCharacters(conditionalDefinition.getConditionExpression());
             xtw.writeEndElement();
         }

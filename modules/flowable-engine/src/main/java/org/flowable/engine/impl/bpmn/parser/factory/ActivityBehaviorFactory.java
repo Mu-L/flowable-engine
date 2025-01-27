@@ -90,7 +90,6 @@ import org.flowable.engine.impl.bpmn.behavior.IntermediateThrowCompensationEvent
 import org.flowable.engine.impl.bpmn.behavior.IntermediateThrowEscalationEventActivityBehavior;
 import org.flowable.engine.impl.bpmn.behavior.IntermediateThrowNoneEventActivityBehavior;
 import org.flowable.engine.impl.bpmn.behavior.IntermediateThrowSignalEventActivityBehavior;
-import org.flowable.engine.impl.bpmn.behavior.MailActivityBehavior;
 import org.flowable.engine.impl.bpmn.behavior.ManualTaskActivityBehavior;
 import org.flowable.engine.impl.bpmn.behavior.NoneEndEventActivityBehavior;
 import org.flowable.engine.impl.bpmn.behavior.NoneStartEventActivityBehavior;
@@ -157,15 +156,9 @@ public interface ActivityBehaviorFactory {
 
     WebServiceActivityBehavior createWebServiceActivityBehavior(SendTask sendTask, BpmnModel bpmnModel);
 
-    MailActivityBehavior createMailActivityBehavior(ServiceTask serviceTask);
+    ActivityBehavior createMailActivityBehavior(ServiceTask serviceTask);
 
-    MailActivityBehavior createMailActivityBehavior(SendTask sendTask);
-
-    // We do not want a hard dependency on the Mule module, hence we return
-    // ActivityBehavior and instantiate the delegate instance using a string instead of the Class itself.
-    ActivityBehavior createMuleActivityBehavior(ServiceTask serviceTask);
-
-    ActivityBehavior createMuleActivityBehavior(SendTask sendTask);
+    ActivityBehavior createMailActivityBehavior(SendTask sendTask);
 
     ActivityBehavior createCamelActivityBehavior(ServiceTask serviceTask);
 
@@ -234,7 +227,7 @@ public interface ActivityBehaviorFactory {
             MessageEventDefinition messageEventDefinition);
     
     IntermediateCatchConditionalEventActivityBehavior createIntermediateCatchConditionalEventActivityBehavior(IntermediateCatchEvent intermediateCatchEvent,
-            ConditionalEventDefinition conditionalEventDefinition, String conditionExpression);
+            ConditionalEventDefinition conditionalEventDefinition, String conditionExpression, String conditionLanguage);
 
     IntermediateCatchTimerEventActivityBehavior createIntermediateCatchTimerEventActivityBehavior(IntermediateCatchEvent intermediateCatchEvent, TimerEventDefinition timerEventDefinition);
 
@@ -275,7 +268,7 @@ public interface ActivityBehaviorFactory {
     BoundaryMessageEventActivityBehavior createBoundaryMessageEventActivityBehavior(BoundaryEvent boundaryEvent, MessageEventDefinition messageEventDefinition, boolean interrupting);
     
     BoundaryConditionalEventActivityBehavior createBoundaryConditionalEventActivityBehavior(BoundaryEvent boundaryEvent, ConditionalEventDefinition conditionalEventDefinition,
-            String conditionExpression, boolean interrupting);
+            String conditionExpression, String conditionLanguage, boolean interrupting);
     
     BoundaryEscalationEventActivityBehavior createBoundaryEscalationEventActivityBehavior(BoundaryEvent boundaryEvent, EscalationEventDefinition escalationEventDefinition, Escalation escalation, boolean interrupting);
 

@@ -30,6 +30,7 @@ import org.flowable.common.engine.api.scope.ScopeTypes;
 import org.flowable.common.engine.impl.context.Context;
 import org.flowable.common.engine.impl.variablelistener.VariableListenerSession;
 import org.flowable.common.engine.impl.variablelistener.VariableListenerSessionData;
+import org.flowable.variable.api.persistence.entity.VariableInstance;
 import org.flowable.variable.service.VariableServiceConfiguration;
 import org.flowable.variable.service.impl.persistence.entity.VariableInitializingList;
 import org.flowable.variable.service.impl.persistence.entity.VariableInstanceEntity;
@@ -338,9 +339,10 @@ public class CaseInstanceEntityImpl extends AbstractCmmnEngineVariableScopeEntit
     }
 
     @Override
-    protected void initializeVariableInstanceBackPointer(VariableInstanceEntity variableInstance) {
+    protected void initializeVariableInstanceBackPointer(VariableInstance variableInstance) {
         variableInstance.setScopeId(id);
         variableInstance.setScopeType(ScopeTypes.CMMN);
+        variableInstance.setScopeDefinitionId(caseDefinitionId);
     }
 
     @Override
@@ -481,5 +483,23 @@ public class CaseInstanceEntityImpl extends AbstractCmmnEngineVariableScopeEntit
     @Override
     public void setCaseDefinitionDeploymentId(String caseDefinitionDeploymentId) {
         this.caseDefinitionDeploymentId = caseDefinitionDeploymentId;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("CaseInstance[id=").append(id)
+                .append(", caseDefinitionId=").append(caseDefinitionId)
+                .append(", caseDefinitionKey=").append(caseDefinitionKey)
+                .append(", parentId=").append(parentId)
+                .append(", name=").append(name);
+
+        if (StringUtils.isNotEmpty(tenantId)) {
+            sb.append(", tenantId=").append(tenantId);
+        }
+
+        sb.append("]");
+
+        return sb.toString();
     }
 }

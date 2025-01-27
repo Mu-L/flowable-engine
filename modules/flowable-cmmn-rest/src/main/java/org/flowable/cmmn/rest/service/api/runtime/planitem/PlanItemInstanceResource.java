@@ -13,8 +13,7 @@
 
 package org.flowable.cmmn.rest.service.api.runtime.planitem;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.flowable.cmmn.api.runtime.PlanItemInstance;
 import org.flowable.cmmn.rest.service.api.RestActionRequest;
@@ -46,7 +45,7 @@ public class PlanItemInstanceResource extends PlanItemInstanceBaseResource {
             @ApiResponse(code = 404, message = "Indicates the plan item instance was not found.")
     })
     @GetMapping(value = "/cmmn-runtime/plan-item-instances/{planItemInstanceId}", produces = "application/json")
-    public PlanItemInstanceResponse getPlanItemInstance(@ApiParam(name = "planItemInstanceId") @PathVariable String planItemInstanceId, HttpServletRequest request) {
+    public PlanItemInstanceResponse getPlanItemInstance(@ApiParam(name = "planItemInstanceId") @PathVariable String planItemInstanceId) {
         return restResponseFactory.createPlanItemInstanceResponse(getPlanItemInstanceFromRequest(planItemInstanceId));
     }
 
@@ -59,7 +58,7 @@ public class PlanItemInstanceResource extends PlanItemInstanceBaseResource {
     })
     @PutMapping(value = "/cmmn-runtime/plan-item-instances/{planItemInstanceId}", produces = "application/json")
     public PlanItemInstanceResponse performPlanItemInstanceAction(@ApiParam(name = "planItemInstanceId") @PathVariable String planItemInstanceId, 
-                    @RequestBody RestActionRequest actionRequest, HttpServletRequest request, HttpServletResponse response) {
+                    @RequestBody RestActionRequest actionRequest, HttpServletResponse response) {
 
         PlanItemInstance planItemInstance = getPlanItemInstanceFromRequest(planItemInstanceId);
         

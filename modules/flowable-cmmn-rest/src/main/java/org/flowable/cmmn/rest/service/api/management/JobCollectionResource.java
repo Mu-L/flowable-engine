@@ -20,9 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.flowable.cmmn.api.CmmnManagementService;
 import org.flowable.cmmn.engine.CmmnEngineConfiguration;
 import org.flowable.cmmn.rest.service.api.BulkMoveDeadLetterActionRequest;
@@ -106,7 +103,7 @@ public class JobCollectionResource {
             @ApiResponse(code = 400, message = "Indicates an illegal value has been used in a url query parameter or the both 'messagesOnly' and 'timersOnly' are used as parameters. Status description contains additional details about the error.")
     })
     @GetMapping(value = "/cmmn-management/jobs", produces = "application/json")
-    public DataResponse<JobResponse> getJobs(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams, HttpServletRequest request) {
+    public DataResponse<JobResponse> getJobs(@ApiParam(hidden = true) @RequestParam Map<String, String> allRequestParams) {
         JobQuery query = managementService.createJobQuery();
 
         if (allRequestParams.containsKey("id")) {
@@ -116,7 +113,7 @@ public class JobCollectionResource {
             query.scopeId(allRequestParams.get("caseInstanceId"));
             query.scopeType(ScopeTypes.CMMN);
         }
-        if (allRequestParams.containsKey("withoutScopeId") && Boolean.valueOf(allRequestParams.get("withoutScopeId"))) {
+        if (allRequestParams.containsKey("withoutScopeId") && Boolean.parseBoolean(allRequestParams.get("withoutScopeId"))) {
             query.withoutScopeId();
         }
         if (allRequestParams.containsKey("planItemInstanceId")) {
@@ -140,11 +137,11 @@ public class JobCollectionResource {
             if (allRequestParams.containsKey("messagesOnly")) {
                 throw new FlowableIllegalArgumentException("Only one of 'timersOnly' or 'messagesOnly' can be provided.");
             }
-            if (Boolean.valueOf(allRequestParams.get("timersOnly"))) {
+            if (Boolean.parseBoolean(allRequestParams.get("timersOnly"))) {
                 query.timers();
             }
         }
-        if (allRequestParams.containsKey("messagesOnly") && Boolean.valueOf(allRequestParams.get("messagesOnly"))) {
+        if (allRequestParams.containsKey("messagesOnly") && Boolean.parseBoolean(allRequestParams.get("messagesOnly"))) {
             query.messages();
         }
         if (allRequestParams.containsKey("dueBefore")) {
@@ -153,7 +150,7 @@ public class JobCollectionResource {
         if (allRequestParams.containsKey("dueAfter")) {
             query.duedateHigherThan(RequestUtil.getDate(allRequestParams, "dueAfter"));
         }
-        if (allRequestParams.containsKey("withException") && Boolean.valueOf(allRequestParams.get("withException"))) {
+        if (allRequestParams.containsKey("withException") && Boolean.parseBoolean(allRequestParams.get("withException"))) {
             query.withException();
         }
         if (allRequestParams.containsKey("exceptionMessage")) {
@@ -165,19 +162,19 @@ public class JobCollectionResource {
         if (allRequestParams.containsKey("tenantIdLike")) {
             query.jobTenantIdLike(allRequestParams.get("tenantIdLike"));
         }
-        if (allRequestParams.containsKey("withoutTenantId") && Boolean.valueOf(allRequestParams.get("withoutTenantId"))) {
+        if (allRequestParams.containsKey("withoutTenantId") && Boolean.parseBoolean(allRequestParams.get("withoutTenantId"))) {
             query.jobWithoutTenantId();
         }
-        if (allRequestParams.containsKey("locked") && Boolean.valueOf(allRequestParams.get("locked"))) {
+        if (allRequestParams.containsKey("locked") && Boolean.parseBoolean(allRequestParams.get("locked"))) {
             query.locked();
         }
-        if (allRequestParams.containsKey("unlocked") && Boolean.valueOf(allRequestParams.get("unlocked"))) {
+        if (allRequestParams.containsKey("unlocked") && Boolean.parseBoolean(allRequestParams.get("unlocked"))) {
             query.unlocked();
         }
         if (allRequestParams.containsKey("scopeType")) {
             query.scopeType(allRequestParams.get("scopeType"));
         }
-        if (allRequestParams.containsKey("withoutProcessInstanceId") && Boolean.valueOf(allRequestParams.get("withoutProcessInstanceId"))) {
+        if (allRequestParams.containsKey("withoutProcessInstanceId") && Boolean.parseBoolean(allRequestParams.get("withoutProcessInstanceId"))) {
             query.withoutProcessInstanceId();
         }
         
@@ -188,15 +185,14 @@ public class JobCollectionResource {
         return paginateList(allRequestParams, query, "id", JobQueryProperties.PROPERTIES, restResponseFactory::createJobResponseList);
     }
 
-    @ApiOperation(value = "Move a bulk of deadletter jobs. Accepts 'move' and 'moveToHistoryJob' as action.", tags = { "Jobs" })
+    @ApiOperation(value = "Move a bulk of deadletter jobs. Accepts 'move' and 'moveToHistoryJob' as action.", tags = { "Jobs" }, code = 204)
     @ApiResponses(value = {
             @ApiResponse(code = 204, message = "Indicates the dead letter jobs where moved. Response-body is intentionally empty."),
             @ApiResponse(code = 500, message = "Indicates the an exception occurred while executing the job. The status-description contains additional detail about the error. The full error-stacktrace can be fetched later on if needed.")
     })
     @ResponseStatus(value = HttpStatus.NO_CONTENT)
     @PostMapping("/cmmn-management/deadletter-jobs")
-    public void executeDeadLetterJobAction(@RequestBody BulkMoveDeadLetterActionRequest actionRequest,
-            HttpServletResponse response) {
+    public void executeDeadLetterJobAction(@RequestBody BulkMoveDeadLetterActionRequest actionRequest) {
         if (actionRequest == null || !(MOVE_ACTION.equals(actionRequest.getAction()) || MOVE_TO_HISTORY_JOB_ACTION.equals(actionRequest.getAction()))) {
             throw new FlowableIllegalArgumentException("Invalid action, only 'move' or 'moveToHistoryJob' is supported.");
         }
@@ -215,7 +211,7 @@ public class JobCollectionResource {
             if (restApiInterceptor != null) {
                 restApiInterceptor.bulkMoveDeadLetterJobs(actionRequest.getJobIds(), MOVE_ACTION);
             }
-            managementService.bulkMoveDeadLetterJobs(actionRequest.getJobIds(), cmmnEngineConfiguration.getAsyncHistoryExecutorNumberOfRetries());
+            managementService.bulkMoveDeadLetterJobs(actionRequest.getJobIds(), cmmnEngineConfiguration.getAsyncExecutorNumberOfRetries());
         } else if (MOVE_TO_HISTORY_JOB_ACTION.equals(actionRequest.getAction())) {
             if (restApiInterceptor != null) {
                 restApiInterceptor.bulkMoveDeadLetterJobs(actionRequest.getJobIds(), MOVE_TO_HISTORY_JOB_ACTION);

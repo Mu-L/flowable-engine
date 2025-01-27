@@ -26,6 +26,8 @@ import org.flowable.cmmn.engine.test.CmmnDeployment;
 import org.flowable.cmmn.engine.test.FlowableCmmnTestCase;
 import org.flowable.cmmn.model.CmmnModel;
 import org.flowable.cmmn.model.PlanItem;
+import org.flowable.cmmn.validation.CaseValidator;
+import org.flowable.cmmn.validation.CaseValidatorImpl;
 import org.flowable.common.engine.api.FlowableException;
 import org.flowable.common.engine.impl.persistence.deploy.DefaultDeploymentCache;
 import org.flowable.common.engine.impl.persistence.deploy.DeploymentCache;
@@ -181,13 +183,47 @@ public class DeploymentTest extends FlowableCmmnTestCase {
                 .addClasspathResource("org/flowable/cmmn/test/repository/DeploymentTest.testCaseDefinitionWithErrors.cmmn")
                 .deploy())
                 .isInstanceOf(FlowableException.class)
-                .hasMessage("Errors while parsing:\n"
-                        + "[Validation set: 'flowable-case' "
-                        + "| Problem: 'flowable-humantask-listener-implementation-missing'] : Element 'class', 'expression' or 'delegateExpression' is mandatory on executionListener - "
-                        + "[Extra info : caseDefinitionId = myCase | caseDefinitionName = My Invalid Case Model |  | id = task1 |  | name = Task 1 | ] "
-                        + "( line: 12, column: 54)\n");
+                .hasMessageContaining("Errors while parsing:\n")
+                .hasMessageContaining("| Problem: 'flowable-humantask-listener-event-missing'] : Element 'event' is mandatory on taskListener "
+                        + "- [Extra info : caseDefinitionId = myCase | caseDefinitionName = My Invalid Case Model |  | id = task1 |  | name = Task 1 | ] ( line: 12, column: 54)\n")
+                .hasMessageContaining("| Problem: 'flowable-humantask-listener-implementation-missing'] : Element 'class', 'expression' or 'delegateExpression' or type=\"script\" is mandatory on taskListener "
+                        + "- [Extra info : caseDefinitionId = myCase | caseDefinitionName = My Invalid Case Model |  | id = task1 |  | name = Task 1 | ] ( line: 12, column: 54)\n")
+        ;
 
         assertThat(cmmnRepositoryService.createCaseDefinitionQuery().list()).isEmpty();
+    }
+
+    @Test
+    public void alreadyDeployedCaseModelWithErrorsShouldNotFail() {
+        CaseValidator originalValidator = cmmnEngineConfiguration.getCaseValidator();
+
+        try {
+            // We disable all the validations so we can test this
+            cmmnEngineConfiguration.setCaseValidator(new CaseValidatorImpl());
+
+            org.flowable.cmmn.api.repository.CmmnDeployment cmmnDeployment = cmmnRepositoryService.createDeployment()
+                    .addClasspathResource("org/flowable/cmmn/test/repository/DeploymentTest.testCaseDefinitionWithErrors.cmmn")
+                    .deploy();
+            autoCleanupDeploymentIds.add(cmmnDeployment.getId());
+            CaseDefinition caseDefinition = cmmnRepositoryService.createCaseDefinitionQuery()
+                    .caseDefinitionKey("myCase")
+                    .singleResult();
+            assertThat(caseDefinition).isNotNull();
+
+            cmmnEngineConfiguration.setCaseValidator(originalValidator);
+
+            // remove it from the cache to force parsing it again
+            cmmnEngineConfiguration.getDeploymentManager()
+                    .getCaseDefinitionCache()
+                    .clear();
+
+            CmmnModel cmmnModel = cmmnRepositoryService.getCmmnModel(caseDefinition.getId());
+
+            assertThat(cmmnModel).isNotNull();
+
+        } finally {
+            cmmnEngineConfiguration.setCaseValidator(originalValidator);
+        }
     }
 
     @Test
@@ -206,6 +242,19 @@ public class DeploymentTest extends FlowableCmmnTestCase {
                 cmmnRepositoryService.deleteDeployment(deployment.getId(), true);
             }
         }
+
+    }
+
+    @Test
+    public void deployingCaseModelWithEmptyCDATAShouldNotFail() {
+        org.flowable.cmmn.api.repository.CmmnDeployment cmmnDeployment = cmmnRepositoryService.createDeployment()
+                .addClasspathResource("org/flowable/cmmn/test/repository/DeploymentTest.testCaseDefinitionWithEmptyCDATA.cmmn")
+                .deploy();
+        autoCleanupDeploymentIds.add(cmmnDeployment.getId());
+        CaseDefinition caseDefinition = cmmnRepositoryService.createCaseDefinitionQuery()
+                .caseDefinitionKey("myCase")
+                .singleResult();
+        assertThat(caseDefinition).isNotNull();
 
     }
 }

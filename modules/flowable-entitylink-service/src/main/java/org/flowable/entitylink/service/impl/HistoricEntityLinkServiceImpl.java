@@ -12,9 +12,11 @@
  */
 package org.flowable.entitylink.service.impl;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.flowable.common.engine.impl.service.CommonServiceImpl;
+import org.flowable.entitylink.api.InternalEntityLinkQuery;
 import org.flowable.entitylink.api.history.HistoricEntityLink;
 import org.flowable.entitylink.api.history.HistoricEntityLinkService;
 import org.flowable.entitylink.service.EntityLinkServiceConfiguration;
@@ -36,23 +38,19 @@ public class HistoricEntityLinkServiceImpl extends CommonServiceImpl<EntityLinkS
     }
     
     @Override
-    public List<HistoricEntityLink> findHistoricEntityLinksByScopeIdAndScopeType(String scopeId, String scopeType, String linkType) {
-        return getHistoricEntityLinkEntityManager().findHistoricEntityLinksByScopeIdAndScopeType(scopeId, scopeType, linkType);
-    }
-
-    @Override
     public List<HistoricEntityLink> findHistoricEntityLinksWithSameRootScopeForScopeIdAndScopeType(String scopeId, String scopeType, String linkType) {
         return getHistoricEntityLinkEntityManager().findHistoricEntityLinksWithSameRootScopeForScopeIdAndScopeType(scopeId, scopeType, linkType);
     }
 
     @Override
-    public List<HistoricEntityLink> findHistoricEntityLinksByReferenceScopeIdAndType(String referenceScopeId, String scopeType, String linkType) {
-        return getHistoricEntityLinkEntityManager().findHistoricEntityLinksByReferenceScopeIdAndType(referenceScopeId, scopeType, linkType);
+    public List<HistoricEntityLink> findHistoricEntityLinksWithSameRootScopeForScopeIdsAndScopeType(Collection<String> scopeIds, String scopeType, String linkType) {
+        return getHistoricEntityLinkEntityManager().findHistoricEntityLinksWithSameRootScopeForScopeIdsAndScopeType(scopeIds, scopeType, linkType);
     }
-    
+
     @Override
-    public List<HistoricEntityLink> findHistoricEntityLinksByScopeDefinitionIdAndScopeType(String scopeDefinitionId, String scopeType, String linkType) {
-        return getHistoricEntityLinkEntityManager().findHistoricEntityLinksByScopeDefinitionIdAndScopeType(scopeDefinitionId, scopeType, linkType);
+    @SuppressWarnings("unchecked")
+    public InternalEntityLinkQuery<HistoricEntityLink> createInternalHistoricEntityLinkQuery() {
+        return (InternalEntityLinkQuery) getHistoricEntityLinkEntityManager().createInternalHistoricEntityLinkQuery();
     }
     
     @Override
@@ -85,6 +83,11 @@ public class HistoricEntityLinkServiceImpl extends CommonServiceImpl<EntityLinkS
         getHistoricEntityLinkEntityManager().deleteHistoricEntityLinksByScopeDefinitionIdAndScopeType(scopeDefinitionId, scopeType);
     }
     
+    @Override
+    public void bulkDeleteHistoricEntityLinksForScopeTypeAndScopeIds(String scopeType, Collection<String> scopeIds) {
+        getHistoricEntityLinkEntityManager().bulkDeleteHistoricEntityLinksForScopeTypeAndScopeIds(scopeType, scopeIds);
+    }
+
     @Override
     public void deleteHistoricEntityLinksForNonExistingProcessInstances() {
         getHistoricEntityLinkEntityManager().deleteHistoricEntityLinksForNonExistingProcessInstances();

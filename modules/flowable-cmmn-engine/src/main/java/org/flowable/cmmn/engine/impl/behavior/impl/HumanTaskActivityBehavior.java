@@ -12,6 +12,10 @@
  */
 package org.flowable.cmmn.engine.impl.behavior.impl;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -25,6 +29,7 @@ import org.flowable.cmmn.engine.impl.behavior.CmmnActivityWithMigrationContextBe
 import org.flowable.cmmn.engine.impl.behavior.PlanItemActivityBehavior;
 import org.flowable.cmmn.engine.impl.event.FlowableCmmnEventBuilder;
 import org.flowable.cmmn.engine.impl.persistence.entity.PlanItemInstanceEntity;
+import org.flowable.cmmn.engine.impl.persistence.entity.PlanItemInstanceEntityManager;
 import org.flowable.cmmn.engine.impl.task.TaskHelper;
 import org.flowable.cmmn.engine.impl.util.CmmnLoggingSessionUtil;
 import org.flowable.cmmn.engine.impl.util.CommandContextUtil;
@@ -44,6 +49,7 @@ import org.flowable.common.engine.api.delegate.event.FlowableEventDispatcher;
 import org.flowable.common.engine.api.scope.ScopeTypes;
 import org.flowable.common.engine.impl.assignment.CandidateUtil;
 import org.flowable.common.engine.impl.el.ExpressionManager;
+import org.flowable.common.engine.impl.identity.Authentication;
 import org.flowable.common.engine.impl.interceptor.CommandContext;
 import org.flowable.common.engine.impl.logging.CmmnLoggingSessionConstants;
 import org.flowable.common.engine.impl.logging.LoggingSessionUtil;
@@ -79,6 +85,7 @@ public class HumanTaskActivityBehavior extends TaskActivityBehavior implements P
             CmmnEngineConfiguration cmmnEngineConfiguration = CommandContextUtil.getCmmnEngineConfiguration(commandContext);
             TaskService taskService = cmmnEngineConfiguration.getTaskServiceConfiguration().getTaskService();
             ExpressionManager expressionManager = CommandContextUtil.getExpressionManager(commandContext);
+            PlanItemInstanceEntityManager planItemInstanceEntityManager = CommandContextUtil.getPlanItemInstanceEntityManager(commandContext);
 
             TaskEntity taskEntity = taskService.createTask();
 
@@ -109,7 +116,7 @@ public class HumanTaskActivityBehavior extends TaskActivityBehavior implements P
             
             handleTaskName(planItemInstanceEntity, expressionManager, taskEntity, beforeContext);
             handleTaskDescription(planItemInstanceEntity, expressionManager, taskEntity, beforeContext);
-            handleAssignee(planItemInstanceEntity, taskService, expressionManager, taskEntity, beforeContext, migrationContext);
+            handleAssignee(planItemInstanceEntity, taskService, expressionManager, taskEntity, planItemInstanceEntityManager, beforeContext, migrationContext);
             handleOwner(planItemInstanceEntity, taskService, expressionManager, taskEntity, beforeContext);
             handlePriority(planItemInstanceEntity, expressionManager, taskEntity, beforeContext);
             handleFormKey(planItemInstanceEntity, expressionManager, taskEntity, beforeContext);
@@ -202,8 +209,8 @@ public class HumanTaskActivityBehavior extends TaskActivityBehavior implements P
     }
 
     protected void handleAssignee(PlanItemInstanceEntity planItemInstanceEntity, TaskService taskService,
-            ExpressionManager expressionManager, TaskEntity taskEntity, CreateHumanTaskBeforeContext beforeContext,
-            MigrationContext migrationContext) {
+            ExpressionManager expressionManager, TaskEntity taskEntity, PlanItemInstanceEntityManager planItemInstanceEntityManager,
+            CreateHumanTaskBeforeContext beforeContext, MigrationContext migrationContext) {
         
         String assigneeStringValue = null;
         if (migrationContext != null && migrationContext.getAssignee() != null) {
@@ -221,6 +228,7 @@ public class HumanTaskActivityBehavior extends TaskActivityBehavior implements P
             }
 
             taskService.changeTaskAssignee(taskEntity, assigneeValue);
+            planItemInstanceEntityManager.updateHumanTaskPlanItemInstanceAssignee(taskEntity, assigneeValue);
         }
     }
 
@@ -261,7 +269,7 @@ public class HumanTaskActivityBehavior extends TaskActivityBehavior implements P
 
     protected void handleFormKey(PlanItemInstanceEntity planItemInstanceEntity, ExpressionManager expressionManager,
             TaskEntity taskEntity, CreateHumanTaskBeforeContext beforeContext) {
-        
+
         if (StringUtils.isNotEmpty(beforeContext.getFormKey())) {
             Object formKey = expressionManager.createExpression(beforeContext.getFormKey()).getValue(planItemInstanceEntity);
             if (formKey != null) {
@@ -282,8 +290,8 @@ public class HumanTaskActivityBehavior extends TaskActivityBehavior implements P
             if (dueDate != null) {
                 if (dueDate instanceof Date) {
                     taskEntity.setDueDate((Date) dueDate);
-                } else if (dueDate instanceof String) {
 
+                } else if (dueDate instanceof String) {
                     String dueDateString = (String) dueDate;
                     if (dueDateString.startsWith("P")) {
                         taskEntity.setDueDate(new DateTime(CommandContextUtil.getCmmnEngineConfiguration(commandContext).getClock().getCurrentTime())
@@ -292,8 +300,17 @@ public class HumanTaskActivityBehavior extends TaskActivityBehavior implements P
                         taskEntity.setDueDate(DateTime.parse(dueDateString).toDate());
                     }
 
+                } else if (dueDate instanceof Instant) {
+                    taskEntity.setDueDate(Date.from((Instant) dueDate));
+
+                } else if (dueDate instanceof LocalDate) {
+                    taskEntity.setDueDate(Date.from(((LocalDate) dueDate).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant()));
+
+                }  else if (dueDate instanceof LocalDateTime) {
+                    taskEntity.setDueDate(Date.from(((LocalDateTime) dueDate).atZone(ZoneId.systemDefault()).toInstant()));
+
                 } else {
-                    throw new FlowableIllegalArgumentException("Due date expression does not resolve to a Date or Date string: " + beforeContext.getDueDate());
+                    throw new FlowableIllegalArgumentException("Due date expression does not resolve to a Date, Instant, LocalDate, LocalDateTime or Date string: " + beforeContext.getDueDate());
                 }
             }
         }
@@ -396,13 +413,13 @@ public class HumanTaskActivityBehavior extends TaskActivityBehavior implements P
         TaskService taskService = cmmnEngineConfiguration.getTaskServiceConfiguration().getTaskService();
         List<TaskEntity> taskEntities = taskService.findTasksBySubScopeIdScopeType(planItemInstance.getId(), ScopeTypes.CMMN);
         if (taskEntities == null || taskEntities.isEmpty()) {
-            throw new FlowableException("No task entity found for plan item instance " + planItemInstance.getId());
+            throw new FlowableException("No task entity found for " + planItemInstance);
         }
 
         // Should be only one
         for (TaskEntity taskEntity : taskEntities) {
             if (!taskEntity.isDeleted()) {
-                TaskHelper.deleteTask(taskEntity, null, false, true, cmmnEngineConfiguration);
+                TaskHelper.completeTask(taskEntity, taskEntity.getTempCompletedBy(), cmmnEngineConfiguration);
             }
         }
 
@@ -417,6 +434,16 @@ public class HumanTaskActivityBehavior extends TaskActivityBehavior implements P
             List<TaskEntity> taskEntities = taskService.findTasksBySubScopeIdScopeType(planItemInstance.getId(), ScopeTypes.CMMN);
             for (TaskEntity taskEntity : taskEntities) {
                 TaskHelper.deleteTask(taskEntity, "cmmn-state-transition-" + transition, false, true, cmmnEngineConfiguration);
+            }
+        } else if (PlanItemTransition.COMPLETE.equals(transition)) {
+            if (humanTask.getTaskCompleterVariableName() != null) {
+
+                ExpressionManager expressionManager = CommandContextUtil.getExpressionManager(commandContext);
+                Expression expression = expressionManager.createExpression(humanTask.getTaskCompleterVariableName());
+                String completerVariableName = (String) expression.getValue(planItemInstance);
+                String completer = Authentication.getAuthenticatedUserId();
+
+                planItemInstance.setVariable(completerVariableName, completer);
             }
         }
     }

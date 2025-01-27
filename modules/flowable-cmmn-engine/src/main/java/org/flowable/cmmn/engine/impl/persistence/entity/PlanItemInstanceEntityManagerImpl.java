@@ -14,13 +14,16 @@
 package org.flowable.cmmn.engine.impl.persistence.entity;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.StringUtils;
 import org.flowable.cmmn.api.history.HistoricPlanItemInstance;
 import org.flowable.cmmn.api.runtime.PlanItemDefinitionType;
 import org.flowable.cmmn.api.runtime.PlanItemInstance;
@@ -29,10 +32,12 @@ import org.flowable.cmmn.api.runtime.PlanItemInstanceState;
 import org.flowable.cmmn.converter.util.PlanItemDependencyUtil;
 import org.flowable.cmmn.engine.CmmnEngineConfiguration;
 import org.flowable.cmmn.engine.impl.persistence.entity.data.PlanItemInstanceDataManager;
+import org.flowable.cmmn.engine.impl.repository.CaseDefinitionUtil;
 import org.flowable.cmmn.engine.impl.runtime.PlanItemInstanceQueryImpl;
 import org.flowable.cmmn.engine.impl.util.CaseInstanceUtil;
 import org.flowable.cmmn.engine.impl.util.CommandContextUtil;
 import org.flowable.cmmn.engine.impl.util.ExpressionUtil;
+import org.flowable.cmmn.model.CmmnModel;
 import org.flowable.cmmn.model.EventListener;
 import org.flowable.cmmn.model.PlanFragment;
 import org.flowable.cmmn.model.PlanItem;
@@ -50,6 +55,7 @@ import org.flowable.job.service.impl.persistence.entity.ExternalWorkerJobEntity;
 import org.flowable.job.service.impl.persistence.entity.ExternalWorkerJobEntityManager;
 import org.flowable.job.service.impl.persistence.entity.TimerJobEntity;
 import org.flowable.job.service.impl.persistence.entity.TimerJobEntityManager;
+import org.flowable.task.service.impl.persistence.entity.TaskEntity;
 import org.flowable.variable.service.VariableService;
 import org.flowable.variable.service.impl.persistence.entity.VariableInstanceEntity;
 
@@ -152,6 +158,9 @@ public class PlanItemInstanceEntityManagerImpl
             stagePlanItemInstanceEntity.getChildPlanItemInstances().add(planItemInstanceEntity);
         } else {
             CaseInstanceEntity caseInstanceEntity = engineConfiguration.getCaseInstanceEntityManager().findById(planItemInstanceEntity.getCaseInstanceId());
+            if (caseInstanceEntity.getChildPlanItemInstances() == null) {
+                caseInstanceEntity.setChildPlanItemInstances(new ArrayList<>());
+            }
             caseInstanceEntity.getChildPlanItemInstances().add(planItemInstanceEntity);
         }
     }
@@ -391,7 +400,12 @@ public class PlanItemInstanceEntityManagerImpl
     public List<PlanItemInstance> findByCriteria(PlanItemInstanceQuery planItemInstanceQuery) {
         return dataManager.findByCriteria((PlanItemInstanceQueryImpl) planItemInstanceQuery);
     }
-    
+
+    @Override
+    public List<PlanItemInstance> findWithVariablesByCriteria(PlanItemInstanceQueryImpl planItemInstanceQuery) {
+        return dataManager.findWithVariablesByCriteria((PlanItemInstanceQueryImpl) planItemInstanceQuery);
+    }
+
     @Override
     public List<PlanItemInstanceEntity> findByCaseInstanceId(String caseInstanceId) {
         return dataManager.findByCaseInstanceId(caseInstanceId);
@@ -413,6 +427,76 @@ public class PlanItemInstanceEntityManagerImpl
     }
 
     @Override
+    public PlanItemInstanceEntity updateHumanTaskPlanItemInstanceAssignee(TaskEntity taskEntity, String assignee) {
+        PlanItemInstanceEntity planItemInstanceEntity = null;
+        if (taskEntity.getScopeId() != null && taskEntity.getSubScopeId() != null) {
+            planItemInstanceEntity = dataManager.findById(taskEntity.getSubScopeId());
+            if (planItemInstanceEntity != null) {
+                if (!Objects.equals(getOriginalAssignee(taskEntity), assignee)) {
+                    planItemInstanceEntity.setAssignee(assignee);
+                    engineConfiguration.getCmmnHistoryManager().recordPlanItemInstanceUpdated(planItemInstanceEntity);
+                }
+            }
+            return planItemInstanceEntity;
+        }
+        return planItemInstanceEntity;
+    }
+
+    protected Object getOriginalAssignee(TaskEntity taskEntity) {
+        if (taskEntity.getOriginalPersistentState() != null) {
+            return ((Map<String, Object>) taskEntity.getOriginalPersistentState()).get("assignee");
+        } else {
+            return null;
+        }
+    }
+
+    @Override
+    public PlanItemInstanceEntity updateHumanTaskPlanItemInstanceCompletedBy(TaskEntity taskEntity, String completedBy) {
+        PlanItemInstanceEntity planItemInstanceEntity = null;
+        if (taskEntity.getScopeId() != null && taskEntity.getSubScopeId() != null) {
+            planItemInstanceEntity = dataManager.findById(taskEntity.getSubScopeId());
+            if (planItemInstanceEntity != null) {
+                if (StringUtils.isNotEmpty(completedBy)) {
+                    planItemInstanceEntity.setCompletedBy(completedBy);
+                } else {
+                    planItemInstanceEntity.setCompletedBy(taskEntity.getAssignee());
+                }
+                engineConfiguration.getCmmnHistoryManager().recordPlanItemInstanceUpdated(planItemInstanceEntity);
+            }
+            return planItemInstanceEntity;
+        }
+        return planItemInstanceEntity;
+    }
+
+    @Override
+    public void updatePlanItemInstancesCaseDefinitionId(String caseInstanceId, String caseDefinitionId) {
+        CommandContext commandContext = Context.getCommandContext();
+        PlanItemInstanceQuery planItemQuery = new PlanItemInstanceQueryImpl(commandContext, engineConfiguration)
+                .caseInstanceId(caseInstanceId)
+                .includeEnded();
+        List<PlanItemInstance> planItemInstances = findByCriteria(planItemQuery);
+        if (planItemInstances != null && !planItemInstances.isEmpty()) {
+            List<String> endStates = Arrays.asList(PlanItemInstanceState.UNAVAILABLE, PlanItemInstanceState.DISABLED, PlanItemInstanceState.COMPLETED, PlanItemInstanceState.TERMINATED, PlanItemInstanceState.FAILED);
+            CmmnModel cmmnModel = CaseDefinitionUtil.getCmmnModel(caseDefinitionId);
+            for (PlanItemInstance planItemInstance : planItemInstances) {
+                if (!endStates.contains(planItemInstance.getState())) {
+                    if (cmmnModel.findPlanItemByPlanItemDefinitionId(planItemInstance.getPlanItemDefinitionId()) == null) {
+                        PlanItemInstanceEntity planItemInstanceEntity = (PlanItemInstanceEntity) planItemInstance;
+                        planItemInstanceEntity.setState(PlanItemInstanceState.TERMINATED);
+                        planItemInstanceEntity.setEndedTime(engineConfiguration.getClock().getCurrentTime());
+                        planItemInstanceEntity.setTerminatedTime(planItemInstanceEntity.getEndedTime());
+                        CommandContextUtil.getCmmnHistoryManager(commandContext).recordPlanItemInstanceTerminated(planItemInstanceEntity);
+                    }
+                }
+                
+                PlanItemInstanceEntity planItemInstanceEntity = (PlanItemInstanceEntity) planItemInstance;
+                planItemInstanceEntity.setCaseDefinitionId(caseDefinitionId);
+                update(planItemInstanceEntity);
+            }
+        }
+    }
+
+    @Override
     public void delete(PlanItemInstanceEntity planItemInstanceEntity, boolean fireEvent) {
         CountingPlanItemInstanceEntity countingPlanItemInstanceEntity = (CountingPlanItemInstanceEntity) planItemInstanceEntity;
         
@@ -423,7 +507,7 @@ public class PlanItemInstanceEntityManagerImpl
             List<VariableInstanceEntity> variableInstanceEntities = variableService
                     .createInternalVariableInstanceQuery()
                     .subScopeId(planItemInstanceEntity.getId())
-                    .scopeTypes(ScopeTypes.CMMN_DEPENDENT)
+                    .scopeTypes(engineConfiguration.getDependentScopeTypes())
                     .list();
             for (VariableInstanceEntity variableInstanceEntity : variableInstanceEntities) {
                 variableService.deleteVariableInstance(variableInstanceEntity);
@@ -468,22 +552,6 @@ public class PlanItemInstanceEntityManagerImpl
         }
         
         getDataManager().delete(planItemInstanceEntity);
-    }
-
-    @Override
-    public void updatePlanItemInstancesCaseDefinitionId(String caseInstanceId, String caseDefinitionId) {
-        CommandContext commandContext = Context.getCommandContext();
-        PlanItemInstanceQuery planItemQuery = new PlanItemInstanceQueryImpl(commandContext, engineConfiguration)
-                .caseInstanceId(caseInstanceId)
-                .includeEnded();
-        List<PlanItemInstance> planItemInstances = findByCriteria(planItemQuery);
-        if (planItemInstances != null) {
-            for (PlanItemInstance planItemInstance : planItemInstances) {
-                PlanItemInstanceEntity planItemInstanceEntity = (PlanItemInstanceEntity) planItemInstance;
-                planItemInstanceEntity.setCaseDefinitionId(caseDefinitionId);
-                update(planItemInstanceEntity);
-            }
-        }
     }
 
     protected CaseInstanceEntityManager getCaseInstanceEntityManager() {

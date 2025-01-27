@@ -169,34 +169,34 @@ public class BeanELResolver extends ELResolver {
 			} catch (IntrospectionException e) {
 				return Collections.<FeatureDescriptor> emptyList().iterator();
 			}
-			return new Iterator<FeatureDescriptor>() {
-				int next = 0;
+			return new Iterator<>() {
+                int next = 0;
 
                 @Override
-				public boolean hasNext() {
-					return properties != null && next < properties.length;
-				}
+                public boolean hasNext() {
+                    return properties != null && next < properties.length;
+                }
 
                 @Override
-				public FeatureDescriptor next() {
-					PropertyDescriptor property = properties[next++];
-					FeatureDescriptor feature = new FeatureDescriptor();
-					feature.setDisplayName(property.getDisplayName());
-					feature.setName(property.getName());
-					feature.setShortDescription(property.getShortDescription());
-					feature.setExpert(property.isExpert());
-					feature.setHidden(property.isHidden());
-					feature.setPreferred(property.isPreferred());
-					feature.setValue(TYPE, property.getPropertyType());
-					feature.setValue(RESOLVABLE_AT_DESIGN_TIME, true);
-					return feature;
-				}
+                public FeatureDescriptor next() {
+                    PropertyDescriptor property = properties[next++];
+                    FeatureDescriptor feature = new FeatureDescriptor();
+                    feature.setDisplayName(property.getDisplayName());
+                    feature.setName(property.getName());
+                    feature.setShortDescription(property.getShortDescription());
+                    feature.setExpert(property.isExpert());
+                    feature.setHidden(property.isHidden());
+                    feature.setPreferred(property.isPreferred());
+                    feature.setValue(TYPE, property.getPropertyType());
+                    feature.setValue(RESOLVABLE_AT_DESIGN_TIME, true);
+                    return feature;
+                }
 
                 @Override
-				public void remove() {
-					throw new UnsupportedOperationException("cannot remove");
-				}
-			};
+                public void remove() {
+                    throw new UnsupportedOperationException("cannot remove");
+                }
+            };
 		}
 		return null;
 	}
@@ -284,7 +284,7 @@ public class BeanELResolver extends ELResolver {
 				Method method = beanProperty.getReadMethod(base);
 				if (method != null) {
 					try {
-						result = method.invoke(base);
+						result = invoke(method, base);
 					} catch (InvocationTargetException e) {
 						throw new ELException(e.getCause());
 					} catch (Exception e) {
@@ -385,7 +385,7 @@ public class BeanELResolver extends ELResolver {
 					throw new PropertyNotWritableException("Cannot write property: " + property);
 				}
 				try {
-					method.invoke(base, value);
+					invoke(method, base, value);
 				} catch (InvocationTargetException e) {
 					throw new ELException("Cannot write property: " + property, e.getCause());
 				} catch (IllegalArgumentException e) {
@@ -473,7 +473,7 @@ public class BeanELResolver extends ELResolver {
 
 			Object[] parameters = Util.buildParameters(target.getParameterTypes(), target.isVarArgs(), params, factory);
 			try {
-				result = target.invoke(base, parameters);
+				result = invoke(target, base, parameters);
 			} catch (InvocationTargetException e) {
 				throw new ELException(e.getCause());
 			} catch (IllegalAccessException e) {
@@ -482,6 +482,10 @@ public class BeanELResolver extends ELResolver {
 			context.setPropertyResolved(true);
 		}
 		return result;
+	}
+
+	protected Object invoke(Method target, Object base, Object... parameters) throws InvocationTargetException, IllegalAccessException {
+		return target.invoke(base, parameters);
 	}
 
 	/**

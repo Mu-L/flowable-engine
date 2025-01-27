@@ -27,6 +27,7 @@ import org.flowable.engine.runtime.ActivityInstance;
 import org.flowable.entitylink.service.impl.persistence.entity.EntityLinkEntity;
 import org.flowable.identitylink.service.impl.persistence.entity.IdentityLinkEntity;
 import org.flowable.task.api.TaskInfo;
+import org.flowable.task.api.history.HistoricTaskInstance;
 import org.flowable.task.service.impl.persistence.entity.TaskEntity;
 import org.flowable.variable.service.impl.persistence.entity.VariableInstanceEntity;
 import org.slf4j.Logger;
@@ -282,6 +283,11 @@ public class DefaultHistoryConfigurationSettings implements HistoryConfiguration
     }
 
     @Override
+    public boolean isHistoryEnabledForVariables(String processDefinitionId) {
+        return isHistoryLevelAtLeast(HistoryLevel.ACTIVITY, processDefinitionId);
+    }
+
+    @Override
     public boolean isHistoryEnabledForIdentityLink(IdentityLinkEntity identityLink) {
         String processDefinitionId = getProcessDefinitionId(identityLink);
         return isHistoryLevelAtLeast(HistoryLevel.AUDIT, processDefinitionId);
@@ -306,7 +312,12 @@ public class DefaultHistoryConfigurationSettings implements HistoryConfiguration
     @Override
     public boolean isHistoryEnabledForEntityLink(EntityLinkEntity entityLink) {
         String processDefinitionId = getProcessDefinitionId(entityLink);
-        return isHistoryLevelAtLeast(HistoryLevel.AUDIT, processDefinitionId);
+        return isHistoryEnabled(processDefinitionId);
+    }
+
+    @Override
+    public boolean isHistoryEnabledForVariables(HistoricTaskInstance historicTaskInstance) {
+        return processEngineConfiguration.getHistoryLevel().isAtLeast(HistoryLevel.ACTIVITY);
     }
 
     protected String getProcessDefinitionId(EntityLinkEntity entityLink) {

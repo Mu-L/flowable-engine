@@ -12,11 +12,13 @@
  */
 package org.flowable.cmmn.engine.impl.history;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.function.Consumer;
 
 import org.apache.commons.lang3.StringUtils;
+import org.flowable.cmmn.api.history.HistoricMilestoneInstance;
 import org.flowable.cmmn.api.history.HistoricPlanItemInstance;
 import org.flowable.cmmn.api.repository.CaseDefinition;
 import org.flowable.cmmn.engine.CmmnEngineConfiguration;
@@ -41,6 +43,7 @@ import org.flowable.entitylink.service.impl.persistence.entity.HistoricEntityLin
 import org.flowable.identitylink.service.HistoricIdentityLinkService;
 import org.flowable.identitylink.service.impl.persistence.entity.HistoricIdentityLinkEntity;
 import org.flowable.identitylink.service.impl.persistence.entity.IdentityLinkEntity;
+import org.flowable.task.api.Task;
 import org.flowable.task.api.history.HistoricTaskInstance;
 import org.flowable.task.api.history.HistoricTaskLogEntryBuilder;
 import org.flowable.task.service.HistoricTaskService;
@@ -158,6 +161,13 @@ public class DefaultCmmnHistoryManager implements CmmnHistoryManager {
         if (getHistoryConfigurationSettings().isHistoryEnabled()) {
             CmmnHistoryHelper.deleteHistoricCaseInstance(cmmnEngineConfiguration, caseInstanceId);
         }
+    } 
+
+    @Override
+    public void recordBulkDeleteHistoricCaseInstances(Collection<String> caseInstanceIds) {
+        if (getHistoryConfigurationSettings().isHistoryEnabled()) {
+            CmmnHistoryHelper.bulkDeleteHistoricCaseInstances(caseInstanceIds, cmmnEngineConfiguration);
+        }
     }
 
     @Override
@@ -245,9 +255,14 @@ public class DefaultCmmnHistoryManager implements CmmnHistoryManager {
     }
 
     @Override
-    public void recordTaskEnd(TaskEntity task, String deleteReason, Date endTime) {
+    public void recordTaskEnd(TaskEntity task, String userId, String deleteReason, Date endTime) {
         if (getHistoryConfigurationSettings().isHistoryEnabledForUserTask(task)) {
-            cmmnEngineConfiguration.getTaskServiceConfiguration().getHistoricTaskService().recordTaskEnd(task, deleteReason, endTime);
+            HistoricTaskInstanceEntity historicTaskInstance = cmmnEngineConfiguration.getTaskServiceConfiguration().getHistoricTaskService().recordTaskEnd(task, deleteReason, endTime);
+            if (historicTaskInstance != null) {
+                historicTaskInstance.setState(Task.COMPLETED);
+                historicTaskInstance.setCompletedBy(userId);
+                historicTaskInstance.setLastUpdateTime(endTime);
+            }
         }
     }
 
@@ -295,6 +310,10 @@ public class DefaultCmmnHistoryManager implements CmmnHistoryManager {
             HistoricPlanItemInstanceEntity historicPlanItemInstanceEntity = historicPlanItemInstanceEntityManager.findById(planItemInstanceEntity.getId());
             if (historicPlanItemInstanceEntity != null) {
                 historicPlanItemInstanceEntity.setFormKey(planItemInstanceEntity.getFormKey());
+                historicPlanItemInstanceEntity.setElementId(planItemInstanceEntity.getElementId());
+                historicPlanItemInstanceEntity.setPlanItemDefinitionId(planItemInstanceEntity.getPlanItemDefinitionId());
+                historicPlanItemInstanceEntity.setAssignee(planItemInstanceEntity.getAssignee());
+                historicPlanItemInstanceEntity.setCompletedBy(planItemInstanceEntity.getCompletedBy());
             }
         }
     }
@@ -417,12 +436,26 @@ public class DefaultCmmnHistoryManager implements CmmnHistoryManager {
                     historicPlanItemInstanceEntityManager.update(planItemEntity);
                 }
             }
+            
+            HistoricMilestoneInstanceQueryImpl historicMilestoneInstanceQuery = new HistoricMilestoneInstanceQueryImpl();
+            historicMilestoneInstanceQuery.milestoneInstanceCaseInstanceId(caseInstance.getId());
+            HistoricMilestoneInstanceEntityManager historicMilestoneInstanceEntityManager = cmmnEngineConfiguration.getHistoricMilestoneInstanceEntityManager();
+            List<HistoricMilestoneInstance> historicMilestoneInstances = historicMilestoneInstanceEntityManager.findHistoricMilestoneInstancesByQueryCriteria(historicMilestoneInstanceQuery);
+            if (historicMilestoneInstances != null) {
+                for (HistoricMilestoneInstance historicMilestoneInstance : historicMilestoneInstances) {
+                    HistoricMilestoneInstanceEntity milestoneEntity = (HistoricMilestoneInstanceEntity) historicMilestoneInstance;
+                    milestoneEntity.setCaseDefinitionId(caseDefinition.getId());
+                    historicMilestoneInstanceEntityManager.update(milestoneEntity);
+                }
+            }
         }
     }
 
     @Override
     public void recordHistoricUserTaskLogEntry(HistoricTaskLogEntryBuilder taskLogEntryBuilder) {
-        cmmnEngineConfiguration.getTaskServiceConfiguration().getHistoricTaskService().createHistoricTaskLogEntry(taskLogEntryBuilder);
+        if (getHistoryConfigurationSettings().isHistoryEnabled(taskLogEntryBuilder.getScopeDefinitionId())) {
+            cmmnEngineConfiguration.getTaskServiceConfiguration().getHistoricTaskService().createHistoricTaskLogEntry(taskLogEntryBuilder);
+        }
     }
 
     @Override
@@ -473,7 +506,7 @@ public class DefaultCmmnHistoryManager implements CmmnHistoryManager {
                     Object stageValueObject = stageExpression.getValue(planItemInstanceEntity);
                     if (!(stageValueObject instanceof Boolean)) {
                         throw new FlowableException("Include in stage overview expression does not resolve to a boolean value " + 
-                                        includeInStageOverviewValue + ": " + stageValueObject);
+                                        includeInStageOverviewValue + ": " + stageValueObject + " for " + planItemInstanceEntity);
                     }
                     
                     showInOverview = (Boolean) stageValueObject;

@@ -17,8 +17,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.flowable.cmmn.rest.service.api.CmmnRestResponseFactory;
 import org.flowable.cmmn.rest.service.api.engine.variable.RestVariable;
@@ -58,7 +57,7 @@ public class TaskVariableDataResource extends TaskVariableBaseResource {
     public byte[] getVariableData(@ApiParam(name = "taskId") @PathVariable("taskId") String taskId,
             @ApiParam(name = "variableName") @PathVariable("variableName") String variableName,
             @ApiParam(hidden = true) @RequestParam(value = "scope", required = false) String scope,
-            HttpServletRequest request, HttpServletResponse response) {
+            HttpServletResponse response) {
         try {
             byte[] result = null;
 

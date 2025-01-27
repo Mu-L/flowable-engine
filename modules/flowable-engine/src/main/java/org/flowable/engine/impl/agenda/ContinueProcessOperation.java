@@ -29,9 +29,11 @@ import org.flowable.common.engine.api.delegate.event.FlowableEventDispatcher;
 import org.flowable.common.engine.impl.interceptor.CommandContext;
 import org.flowable.common.engine.impl.logging.LoggingSessionConstants;
 import org.flowable.common.engine.impl.util.CollectionUtil;
+import org.flowable.engine.delegate.BpmnError;
 import org.flowable.engine.delegate.ExecutionListener;
 import org.flowable.engine.delegate.event.impl.FlowableEventBuilder;
 import org.flowable.engine.impl.bpmn.behavior.BoundaryEventRegistryEventActivityBehavior;
+import org.flowable.engine.impl.bpmn.helper.ErrorPropagation;
 import org.flowable.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.flowable.engine.impl.delegate.ActivityBehavior;
 import org.flowable.engine.impl.delegate.ActivityWithMigrationContextBehavior;
@@ -87,7 +89,7 @@ public class ContinueProcessOperation extends AbstractOperation {
         } else if (currentFlowElement instanceof SequenceFlow) {
             continueThroughSequenceFlow((SequenceFlow) currentFlowElement);
         } else {
-            throw new FlowableException("Programmatic error: no current flow element found or invalid type: " + currentFlowElement + ". Halting.");
+            throw new FlowableException("Programmatic error: no current flow element found or invalid type: " + currentFlowElement + ". For " + execution + ". Halting.");
         }
     }
 
@@ -148,7 +150,12 @@ public class ContinueProcessOperation extends AbstractOperation {
 
         // Execution listener: event 'start'
         if (CollectionUtil.isNotEmpty(flowNode.getExecutionListeners())) {
-            executeExecutionListeners(flowNode, ExecutionListener.EVENTNAME_START);
+            try {
+                executeExecutionListeners(flowNode, ExecutionListener.EVENTNAME_START);
+            } catch (BpmnError bpmnError) {
+                ErrorPropagation.propagateError(bpmnError, execution);
+                return;
+            }
         }
 
         // Create any boundary events, sub process boundary events will be created from the activity behavior
@@ -191,13 +198,18 @@ public class ContinueProcessOperation extends AbstractOperation {
 
     protected void executeMultiInstanceSynchronous(FlowNode flowNode) {
 
-        // Execution listener: event 'start'
-        if (CollectionUtil.isNotEmpty(flowNode.getExecutionListeners())) {
-            executeExecutionListeners(flowNode, ExecutionListener.EVENTNAME_START);
-        }
-        
         if (!hasMultiInstanceRootExecution(execution, flowNode)) {
             execution = createMultiInstanceRootExecution(execution);
+        }
+
+        // Execution listener: event 'start'
+        if (CollectionUtil.isNotEmpty(flowNode.getExecutionListeners())) {
+            try {
+                executeExecutionListeners(flowNode, ExecutionListener.EVENTNAME_START);
+            } catch (BpmnError bpmnError) {
+                ErrorPropagation.propagateError(bpmnError, execution);
+               return;
+            }
         }
 
         // Execute the multi instance behavior
@@ -221,7 +233,7 @@ public class ContinueProcessOperation extends AbstractOperation {
             }
             
         } else {
-            throw new FlowableException("Expected an activity behavior in flow node " + flowNode.getId());
+            throw new FlowableException("Expected an activity behavior in flow node " + flowNode.getId() + " for " + execution);
         }
     }
     
@@ -297,9 +309,14 @@ public class ContinueProcessOperation extends AbstractOperation {
     protected void continueThroughSequenceFlow(SequenceFlow sequenceFlow) {
         // Execution listener. Sequenceflow only 'take' makes sense ... but we've supported all three since the beginning
         if (CollectionUtil.isNotEmpty(sequenceFlow.getExecutionListeners())) {
-            executeExecutionListeners(sequenceFlow, ExecutionListener.EVENTNAME_START);
-            executeExecutionListeners(sequenceFlow, ExecutionListener.EVENTNAME_TAKE);
-            executeExecutionListeners(sequenceFlow, ExecutionListener.EVENTNAME_END);
+            try {
+                executeExecutionListeners(sequenceFlow, ExecutionListener.EVENTNAME_START);
+                executeExecutionListeners(sequenceFlow, ExecutionListener.EVENTNAME_TAKE);
+                executeExecutionListeners(sequenceFlow, ExecutionListener.EVENTNAME_END);
+            } catch (BpmnError bpmnError) {
+                ErrorPropagation.propagateError(bpmnError, execution);
+                return;
+            }
         }
 
         // Firing event that transition is being taken

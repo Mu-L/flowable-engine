@@ -42,7 +42,7 @@ public class DefaultOutboundEventProcessor implements OutboundEventProcessor {
     @Override
     public void sendEvent(EventInstance eventInstance, Collection<ChannelModel> channelModels) {
         if (channelModels == null || channelModels.isEmpty()) {
-            throw new FlowableException("No channel model set for outgoing event " + eventInstance.getEventKey());
+            throw new FlowableException("No channel model set for outgoing " + eventInstance);
         }
 
         for (ChannelModel channelModel : channelModels) {
@@ -62,7 +62,7 @@ public class DefaultOutboundEventProcessor implements OutboundEventProcessor {
                 throw new FlowableException("Could not find an outbound channel adapter for channel " + channelModel.getKey());
             }
             
-            outboundEventChannelAdapter.sendEvent(rawEvent, headerMap);
+            outboundEventChannelAdapter.sendEvent(new DefaultOutboundEvent(rawEvent, eventInstance, headerMap));
         }
     }
 
